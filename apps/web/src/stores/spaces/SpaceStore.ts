@@ -175,10 +175,7 @@ export class SpaceStoreClass extends AsyncStoreWithClient<EmptyObject> {
      * @private
      */
     private get metaSpaceOrder(): MetaSpace[] {
-        if (!SettingsStore.getValue("feature_new_room_list")) return metaSpaceOrder;
-
-        // People and Favourites are not shown when the new room list is enabled
-        return metaSpaceOrder.filter((space) => space !== MetaSpace.People && space !== MetaSpace.Favourites);
+        return metaSpaceOrder;
     }
 
     public get invitedSpaces(): Room[] {
