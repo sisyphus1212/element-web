@@ -6,8 +6,11 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React, { useCallback, useEffect, useMemo, useState, type JSX } from "react";
-import classNames from "classnames";
+import { ChatFilter, IconButton } from "@vector-im/compound-web";
+import ChevronDownIcon from "@vector-im/compound-design-tokens/assets/web/icons/chevron-down";
+import { type RoomListItemSnapshot, RoomListItemView, RoomNotifState, type RoomItemViewModel } from "@element-hq/web-shared-components";
 
+import BaseAvatar from "../../avatars/BaseAvatar";
 import { _t } from "../../../../languageHandler";
 
 type PeopleFilter = "all" | "online" | "offline";
@@ -41,6 +44,52 @@ function matchesFilter(item: PeopleNodeItem, filter: PeopleFilter): boolean {
     return !isOnline(item.status);
 }
 
+function makeSnapshot(item: PeopleNodeItem, pending: boolean): RoomListItemSnapshot {
+    return {
+        id: item.node_id,
+        room: item,
+        name: item.display_name,
+        isBold: isOnline(item.status),
+        messagePreview: pending ? _t("common|loading") : `@${item.node_id}`,
+        notification: {
+            hasAnyNotificationOrActivity: false,
+            isUnsentMessage: false,
+            invited: false,
+            isMention: false,
+            isActivityNotification: false,
+            isNotification: false,
+            hasUnreadCount: false,
+            count: 0,
+            muted: !isOnline(item.status),
+        },
+        showMoreOptionsMenu: false,
+        showNotificationMenu: false,
+        isFavourite: false,
+        isLowPriority: false,
+        canInvite: false,
+        canCopyRoomLink: false,
+        canMarkAsRead: false,
+        canMarkAsUnread: false,
+        roomNotifState: RoomNotifState.AllMessages,
+    };
+}
+
+function makeVm(snapshot: RoomListItemSnapshot, onOpen: () => void): RoomItemViewModel {
+    return {
+        getSnapshot: () => snapshot,
+        subscribe: () => () => undefined,
+        onOpenRoom: onOpen,
+        onMarkAsRead: () => undefined,
+        onMarkAsUnread: () => undefined,
+        onToggleFavorite: () => undefined,
+        onToggleLowPriority: () => undefined,
+        onInvite: () => undefined,
+        onCopyRoomLink: () => undefined,
+        onLeaveRoom: () => undefined,
+        onSetRoomNotifState: () => undefined,
+    };
+}
+
 export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [items, setItems] = useState<PeopleNodeItem[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -48,6 +97,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [filter, setFilter] = useState<PeopleFilter>("all");
     const [error, setError] = useState<string>("");
     const [activeRoute, setActiveRoute] = useState<string>(currentHashRoute());
+    const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
     useEffect(() => {
         const onHashChange = (): void => setActiveRoute(currentHashRoute());
@@ -96,103 +146,97 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             });
     }, [items, filter]);
 
-    const onOpenNode = useCallback(async (nodeId: string) => {
-        const id = String(nodeId || "");
-        if (!id) return;
-        setResolvingNodeId(id);
-        setError("");
-        try {
-            const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
-                method: "GET",
-                cache: "no-store",
-            });
-            const body = await response.json();
-            if (!body?.ok || !body?.route) {
-                throw new Error(String(body?.error || "resolve_route_failed"));
+    const onOpenNode = useCallback(
+        async (nodeId: string) => {
+            const id = String(nodeId || "");
+            if (!id) return;
+            setResolvingNodeId(id);
+            setError("");
+            try {
+                const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
+                    method: "GET",
+                    cache: "no-store",
+                });
+                const body = await response.json();
+                if (!body?.ok || !body?.route) {
+                    throw new Error(String(body?.error || "resolve_route_failed"));
+                }
+                const route = normalizeRoute(String(body.route || ""));
+                if (!route) {
+                    throw new Error("empty_route");
+                }
+                window.location.hash = route;
+                setActiveRoute(route);
+                void reloadNodes();
+            } catch (e) {
+                setError(`Open node failed: ${String((e as Error)?.message || e)}`);
+            } finally {
+                setResolvingNodeId("");
             }
-            const route = normalizeRoute(String(body.route || ""));
-            if (!route) {
-                throw new Error("empty_route");
-            }
-            window.location.hash = route;
-            setActiveRoute(route);
-            void reloadNodes();
-        } catch (e) {
-            setError(`Open node failed: ${String((e as Error)?.message || e)}`);
-        } finally {
-            setResolvingNodeId("");
-        }
-    }, [reloadNodes]);
+        },
+        [reloadNodes],
+    );
 
-    const filterButton = (name: PeopleFilter, label: string): JSX.Element => {
-        const selected = filter === name;
-        return (
-            <button
-                key={name}
-                type="button"
-                role="option"
-                className={classNames("mx_AccessibleButton", { mx_AccessibleButton_hasKind: selected })}
-                aria-selected={selected}
-                onClick={() => setFilter(name)}
-            >
-                {label}
-            </button>
-        );
-    };
+    const renderAvatar = useCallback((roomLike: unknown): React.ReactNode => {
+        const node = roomLike as PeopleNodeItem;
+        return <BaseAvatar name={String(node?.display_name || "node")} idName={String(node?.node_id || "node")} size="32px" />;
+    }, []);
 
     return (
         <>
-            <div data-testid="primary-filters" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div role="listbox" aria-label="Room list filters" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {filterButton("all", "All")}
-                    {filterButton("online", "Online")}
-                    {filterButton("offline", "Offline")}
+            <div>
+                <div
+                    data-testid="primary-filters"
+                    style={{ display: "flex", flexDirection: "row-reverse", justifyContent: "space-between", gap: "var(--cpd-space-3x)" }}
+                >
+                    <IconButton
+                        kind="secondary"
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? "Collapse filter list" : "Expand filter list"}
+                        size="28px"
+                        onClick={() => setIsExpanded((v) => !v)}
+                    >
+                        <ChevronDownIcon />
+                    </IconButton>
+                    <div
+                        role="listbox"
+                        aria-label="Room list filters"
+                        style={{ display: "flex", alignItems: "center", gap: "var(--cpd-space-2x)", flexWrap: isExpanded ? "wrap" : "nowrap", overflowX: "auto" }}
+                    >
+                        <ChatFilter role="option" selected={filter === "all"} onClick={() => setFilter("all")}>All</ChatFilter>
+                        <ChatFilter role="option" selected={filter === "online"} onClick={() => setFilter("online")}>Online</ChatFilter>
+                        <ChatFilter role="option" selected={filter === "offline"} onClick={() => setFilter("offline")}>Offline</ChatFilter>
+                    </div>
                 </div>
             </div>
 
             {error && <div className="mx_InlineError">{error}</div>}
 
-            <div
-                data-testid="room-list"
-                role="listbox"
-                aria-label={_t("room_list|list_title")}
-                className="mx_AutoHideScrollbar"
-                style={{ height: "100%", overflowY: "auto" }}
-            >
+            <div data-testid="room-list" role="listbox" aria-label={_t("room_list|list_title")} style={{ height: "100%", overflowY: "auto" }}>
                 {loading ? (
                     <div className="mx_RoomSublist_empty">{_t("common|loading")}</div>
                 ) : visibleItems.length === 0 ? (
                     <div className="mx_RoomSublist_empty">{_t("common|no_results")}</div>
                 ) : (
                     visibleItems.map((it, index) => {
-                        const selected = normalizeRoute(it.last_room_route) !== "" && normalizeRoute(it.last_room_route) === activeRoute;
+                        const route = normalizeRoute(it.last_room_route);
+                        const selected = route !== "" && route === activeRoute;
                         const pending = resolvingNodeId === it.node_id;
+                        const snapshot = makeSnapshot(it, pending);
+                        const vm = makeVm(snapshot, () => {
+                            void onOpenNode(it.node_id);
+                        });
                         return (
-                            <button
+                            <RoomListItemView
                                 key={it.node_id}
-                                type="button"
-                                role="option"
-                                aria-selected={selected}
-                                aria-posinset={index + 1}
-                                aria-setsize={visibleItems.length}
-                                aria-label={`Open person ${it.display_name}`}
-                                className={classNames("mx_RoomListItemView", {
-                                    mx_RoomListItemView_selected: selected,
-                                })}
-                                onClick={() => void onOpenNode(it.node_id)}
-                            >
-                                <div style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ minWidth: 0 }}>
-                                        <div data-testid="room-name" title={it.display_name}>
-                                            {it.display_name}
-                                        </div>
-                                        <div className="mx_RoomTile_subtitle">@{it.node_id}</div>
-                                    </div>
-                                    <div aria-hidden="true" style={{ opacity: 0.7, fontSize: "12px" }}>
-                                        {pending ? _t("common|loading") : isOnline(it.status) ? "online" : "offline"}
-                                    </div>
-                                </div>
-                            </button>
+                                vm={vm}
+                                isSelected={selected}
+                                isFocused={false}
+                                onFocus={() => undefined}
+                                roomIndex={index}
+                                roomCount={visibleItems.length}
+                                renderAvatar={renderAvatar}
+                            />
                         );
                     })
                 )}

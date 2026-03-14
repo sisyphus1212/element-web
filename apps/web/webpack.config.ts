@@ -221,6 +221,7 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
                           // that the plugin would otherwise pointlessly extract into a separate
                           // file. We add the actual license using CopyWebpackPlugin below.
                           exclude: "jitsi_external_api.min.js",
+                          parallel: false,
                       }),
                       new CssMinimizerPlugin(),
                   ]
