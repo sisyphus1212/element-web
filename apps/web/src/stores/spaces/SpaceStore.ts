@@ -1194,7 +1194,10 @@ export class SpaceStoreClass extends AsyncStoreWithClient<EmptyObject> {
         this.matrixClient.on(ClientEvent.AccountData, this.onAccountData);
 
         const oldMetaSpaces = this._enabledMetaSpaces;
-        const enabledMetaSpaces = SettingsStore.getValue("Spaces.enabledMetaSpaces");
+        const enabledMetaSpaces = {
+            ...SettingsStore.getValue("Spaces.enabledMetaSpaces"),
+            [MetaSpace.People]: true,
+        };
         this._enabledMetaSpaces = this.metaSpaceOrder.filter((k) => enabledMetaSpaces[k]);
 
         this._allRoomsInHome = SettingsStore.getValue("Spaces.allRoomsInHome");
@@ -1311,7 +1314,10 @@ export class SpaceStoreClass extends AsyncStoreWithClient<EmptyObject> {
                     }
 
                     case "Spaces.enabledMetaSpaces": {
-                        const newValue = SettingsStore.getValue("Spaces.enabledMetaSpaces");
+                        const newValue = {
+                            ...SettingsStore.getValue("Spaces.enabledMetaSpaces"),
+                            [MetaSpace.People]: true,
+                        };
                         const enabledMetaSpaces = this.metaSpaceOrder.filter((k) => newValue[k]);
                         if (arrayHasDiff(this._enabledMetaSpaces, enabledMetaSpaces)) {
                             const hadPeopleOrHomeEnabled = this.enabledMetaSpaces.some((s) => {
