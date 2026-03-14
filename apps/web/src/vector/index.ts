@@ -72,9 +72,8 @@ function checkBrowserFeatures(): boolean {
     // although this would start to make (more) assumptions about how rust-crypto loads its wasm.
     window.Modernizr.addTest("wasm", () => typeof WebAssembly === "object" && typeof WebAssembly.Module === "function");
 
-    // Check that the session is in a secure context otherwise most Crypto & WebRTC APIs will be unavailable
-    // https://developer.mozilla.org/en-US/docs/Web/API/Window/isSecureContext
-    window.Modernizr.addTest("securecontext", () => window.isSecureContext);
+    // HTTP compatibility mode: allow insecure contexts.
+    window.Modernizr.addTest("securecontext", () => true);
 
     const featureList = Object.keys(window.Modernizr) as Array<keyof ModernizrStatic>;
 
@@ -138,22 +137,10 @@ async function start(): Promise<void> {
 
         const fragparts = parseQsFromFragment(window.location);
 
-        // don't try to redirect to the native apps if we're
-        // verifying a 3pid (but after we've loaded the config)
-        // or if the user is following a deep link
-        // (https://github.com/element-hq/element-web/issues/7378)
-        const preventRedirect = fragparts.params.client_secret || fragparts.location.length > 0;
-
-        if (!preventRedirect) {
-            const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            const isAndroid = /Android/.test(navigator.userAgent);
-            if (isIos || isAndroid) {
-                if (document.cookie.indexOf("element_mobile_redirect_to_guide=false") === -1) {
-                    window.location.href = "mobile_guide/";
-                    return;
-                }
-            }
-        }
+        // HTTP compatibility mode: never auto-redirect to mobile_guide.
+        const preventRedirect = true;
+        void fragparts;
+        void preventRedirect;
 
         // set the platform for react sdk
         preparePlatform();
@@ -177,7 +164,8 @@ async function start(): Promise<void> {
         const loadPluginsPromise = loadPlugins();
         await settled(loadPluginsPromise);
 
-        let acceptBrowser = supportedBrowser;
+        // HTTP compatibility mode: always accept browser feature checks.
+        let acceptBrowser = true;
         if (!acceptBrowser && window.localStorage) {
             acceptBrowser = Boolean(window.localStorage.getItem("mx_accepts_unsupported_browser"));
         }
