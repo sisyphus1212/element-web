@@ -20,6 +20,21 @@ interface PeopleNodeItem {
     display_name: string;
     status: string;
     last_room_route: string;
+    matrix_user_id: string;
+}
+
+interface NodeControlState {
+    active_node_session_id: string;
+    active_codex_thread_id: string;
+    active_runtime_profile_id: string;
+    matrix_route?: { matrix_room_id?: string; matrix_thread_id?: string };
+}
+
+interface RuntimeProfileItem {
+    runtime_profile_id: string;
+    version: number;
+    is_default: boolean;
+    config?: Record<string, unknown>;
 }
 
 async function ensureManagerToken(): Promise<string> {
@@ -145,6 +160,10 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [error, setError] = useState<string>("");
     const [activeRoute, setActiveRoute] = useState<string>(currentHashRoute());
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
+    const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+    const [controlState, setControlState] = useState<NodeControlState | null>(null);
+    const [threadItems, setThreadItems] = useState<Array<{ codex_thread_id: string; title: string; archived: boolean }>>([]);
+    const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
 
     useEffect(() => {
         const onHashChange = (): void => setActiveRoute(currentHashRoute());
@@ -171,6 +190,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     display_name: String(it?.display_name || it?.node_id || ""),
                     status: String(it?.status || "offline"),
                     last_room_route: normalizeRoute(String(it?.last_room_route || "")),
+                    matrix_user_id: String(it?.matrix_user_id || ""),
                 }))
                 .filter((it: PeopleNodeItem) => it.node_id);
             setItems(rows);
@@ -202,25 +222,84 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             const id = String(nodeId || "");
             if (!id) return;
             setResolvingNodeId(id);
+            setSelectedNodeId(id);
             setError("");
             try {
                 const token = await ensureManagerToken();
-                const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
-                    method: "GET",
+                const openRes = await fetch("/api/node-sessions/open", {
+                    method: "POST",
                     cache: "no-store",
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+                    body: JSON.stringify({ node_id: id }),
                 });
-                const body = await response.json();
-                if (!body?.ok || !body?.route) {
-                    throw new Error(String(body?.error || "resolve_route_failed"));
+                const openBody = await openRes.json().catch(() => ({} as any));
+                let route = normalizeRoute(String(openBody?.matrix_room_route || ""));
+                if (!openBody?.ok || !route) {
+                    const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const body = await response.json();
+                    if (!body?.ok || !body?.route) {
+                        throw new Error(String(body?.error || openBody?.error || "resolve_route_failed"));
+                    }
+                    route = normalizeRoute(String(body.route || ""));
                 }
-                const route = normalizeRoute(String(body.route || ""));
                 if (!route) {
                     throw new Error("empty_route");
                 }
                 window.location.hash = route;
                 setActiveRoute(route);
                 void reloadNodes();
+                const [stRes, thRes, rpRes] = await Promise.all([
+                    fetch(`/api/nodes/${encodeURIComponent(id)}/control-state`, {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                    fetch(`/api/nodes/${encodeURIComponent(id)}/codex-threads`, {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                    fetch(`/api/nodes/${encodeURIComponent(id)}/runtime-profiles`, {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                ]);
+                const stBody = await stRes.json().catch(() => ({} as any));
+                const thBody = await thRes.json().catch(() => ({} as any));
+                const rpBody = await rpRes.json().catch(() => ({} as any));
+                if (stBody?.ok && stBody?.state) {
+                    setControlState(stBody.state as NodeControlState);
+                } else {
+                    setControlState(null);
+                }
+                if (thBody?.ok && Array.isArray(thBody.items)) {
+                    setThreadItems(
+                        thBody.items.map((x: any) => ({
+                            codex_thread_id: String(x?.codex_thread_id || ""),
+                            title: String(x?.title || ""),
+                            archived: Boolean(x?.archived),
+                        })).filter((x: any) => x.codex_thread_id),
+                    );
+                } else {
+                    setThreadItems([]);
+                }
+                if (rpBody?.ok && Array.isArray(rpBody.items)) {
+                    setRuntimeProfiles(
+                        rpBody.items.map((x: any) => ({
+                            runtime_profile_id: String(x?.runtime_profile_id || ""),
+                            version: Number(x?.version || 0),
+                            is_default: Boolean(x?.is_default),
+                            config: (x?.config && typeof x.config === "object") ? x.config : {},
+                        })).filter((x: any) => x.runtime_profile_id),
+                    );
+                } else {
+                    setRuntimeProfiles([]);
+                }
             } catch (e) {
                 setError(`Open node failed: ${String((e as Error)?.message || e)}`);
             } finally {
@@ -294,6 +373,92 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     })
                 )}
             </div>
+            {selectedNodeId && (
+                <div style={{ marginTop: 12, padding: 8, borderTop: "1px solid var(--cpd-color-border-subtle-primary)" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Node Controls: {selectedNodeId}</div>
+                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
+                        session={String(controlState?.active_node_session_id || "-")} thread={String(controlState?.active_codex_thread_id || "-")}
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Threads</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {threadItems.length === 0 ? <span style={{ opacity: 0.7 }}>No threads</span> : threadItems.map((t) => (
+                                <button
+                                    key={t.codex_thread_id}
+                                    type="button"
+                                    disabled={t.archived}
+                                    onClick={async () => {
+                                        try {
+                                            const token = await ensureManagerToken();
+                                            const nsid = String(controlState?.active_node_session_id || "").trim();
+                                            if (!nsid) throw new Error("missing_active_node_session_id");
+                                            const rep = await fetch(`/api/node-sessions/${encodeURIComponent(nsid)}/switch-codex-thread`, {
+                                                method: "POST",
+                                                cache: "no-store",
+                                                headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+                                                body: JSON.stringify({ codex_thread_id: t.codex_thread_id }),
+                                            });
+                                            const body = await rep.json().catch(() => ({} as any));
+                                            if (!body?.ok) throw new Error(String(body?.error || "switch_thread_failed"));
+                                            setControlState((prev) => ({ ...(prev || ({} as NodeControlState)), active_codex_thread_id: t.codex_thread_id }));
+                                        } catch (e) {
+                                            setError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: "2px 6px",
+                                        borderRadius: 8,
+                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                        background:
+                                            String(controlState?.active_codex_thread_id || "") === t.codex_thread_id
+                                                ? "var(--cpd-color-bg-canvas-default)"
+                                                : "transparent",
+                                    }}
+                                >
+                                    {t.title || t.codex_thread_id.slice(0, 8)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Runtime Profiles</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {runtimeProfiles.length === 0 ? <span style={{ opacity: 0.7 }}>No runtime profiles</span> : runtimeProfiles.map((rp) => (
+                                <button
+                                    key={rp.runtime_profile_id}
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            const token = await ensureManagerToken();
+                                            const rep = await fetch(
+                                                `/api/nodes/${encodeURIComponent(selectedNodeId)}/runtime-profiles/${encodeURIComponent(rp.runtime_profile_id)}/apply`,
+                                                {
+                                                    method: "POST",
+                                                    cache: "no-store",
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                },
+                                            );
+                                            const body = await rep.json().catch(() => ({} as any));
+                                            if (!body?.ok) throw new Error(String(body?.error || "apply_runtime_profile_failed"));
+                                            setRuntimeProfiles((prev) => prev.map((x) => ({ ...x, is_default: x.runtime_profile_id === rp.runtime_profile_id })));
+                                        } catch (e) {
+                                            setError(`Apply runtime profile failed: ${String((e as Error)?.message || e)}`);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: "2px 6px",
+                                        borderRadius: 8,
+                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                        background: rp.is_default ? "var(--cpd-color-bg-canvas-default)" : "transparent",
+                                    }}
+                                >
+                                    {rp.runtime_profile_id.slice(0, 8)} v{rp.version}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
