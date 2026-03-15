@@ -22,6 +22,53 @@ interface PeopleNodeItem {
     last_room_route: string;
 }
 
+async function ensureManagerToken(): Promise<string> {
+    const readToken = (): string => {
+        try {
+            return String(window.localStorage.getItem("mgr_web_token") || "").trim();
+        } catch {
+            return "";
+        }
+    };
+    const writeToken = (token: string): void => {
+        try {
+            window.localStorage.setItem("mgr_web_token", token);
+        } catch {}
+    };
+    const cur = readToken();
+    if (cur) {
+        try {
+            const meRes = await fetch("/api/auth/me", {
+                method: "GET",
+                cache: "no-store",
+                headers: { Authorization: `Bearer ${cur}` },
+            });
+            if (meRes.ok) return cur;
+        } catch {}
+    }
+    const rep = await fetch("/api/auth/login", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: "manager", password: "admin" }),
+    });
+    const body = await rep.json().catch(() => ({} as any));
+    const tok = String((body as any)?.token || "").trim();
+    if (!tok) throw new Error(String((body as any)?.error || "auth_login_failed"));
+    writeToken(tok);
+    return tok;
+}
+
+function authHeaders(): Record<string, string> {
+    try {
+        const t = String(window.localStorage.getItem("mgr_web_token") || "").trim();
+        if (!t) return {};
+        return { Authorization: `Bearer ${t}` };
+    } catch {
+        return {};
+    }
+}
+
 function currentHashRoute(): string {
     const raw = String(window.location.hash || "").trim();
     if (!raw) return "";
@@ -109,7 +156,11 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch("/api/public/nodes", { method: "GET", cache: "no-store" });
+            const response = await fetch("/api/public/nodes", {
+                method: "GET",
+                cache: "no-store",
+                headers: authHeaders(),
+            });
             const body = await response.json();
             if (!body?.ok || !Array.isArray(body.items)) {
                 throw new Error(String(body?.error || "invalid_nodes_payload"));
@@ -153,9 +204,11 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             setResolvingNodeId(id);
             setError("");
             try {
+                const token = await ensureManagerToken();
                 const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
                     method: "GET",
                     cache: "no-store",
+                    headers: { Authorization: `Bearer ${token}` },
                 });
                 const body = await response.json();
                 if (!body?.ok || !body?.route) {
