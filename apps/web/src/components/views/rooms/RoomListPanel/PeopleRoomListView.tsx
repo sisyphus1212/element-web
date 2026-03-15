@@ -37,6 +37,19 @@ interface RuntimeProfileItem {
     config?: Record<string, unknown>;
 }
 
+interface NodeDetailItem {
+    node_id: string;
+    display_name: string;
+    status: string;
+    last_seen: number;
+    matrix_user_id: string;
+    threads_total?: number;
+    threads_archived?: number;
+    runtime_profiles_total?: number;
+    runtime_profiles_default?: number;
+    control_state?: NodeControlState;
+}
+
 async function ensureManagerToken(): Promise<string> {
     const readToken = (): string => {
         try {
@@ -164,6 +177,8 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [controlState, setControlState] = useState<NodeControlState | null>(null);
     const [threadItems, setThreadItems] = useState<Array<{ codex_thread_id: string; title: string; archived: boolean }>>([]);
     const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
+    const [nodeDetail, setNodeDetail] = useState<NodeDetailItem | null>(null);
+    const [detailOpen, setDetailOpen] = useState<boolean>(false);
 
     useEffect(() => {
         const onHashChange = (): void => setActiveRoute(currentHashRoute());
@@ -300,6 +315,17 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                 } else {
                     setRuntimeProfiles([]);
                 }
+                const detRes = await fetch(`/api/nodes/${encodeURIComponent(id)}/details`, {
+                    method: "GET",
+                    cache: "no-store",
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const detBody = await detRes.json().catch(() => ({} as any));
+                if (detBody?.ok && detBody?.item) {
+                    setNodeDetail(detBody.item as NodeDetailItem);
+                } else {
+                    setNodeDetail(null);
+                }
             } catch (e) {
                 setError(`Open node failed: ${String((e as Error)?.message || e)}`);
             } finally {
@@ -375,10 +401,47 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             </div>
             {selectedNodeId && (
                 <div style={{ marginTop: 12, padding: 8, borderTop: "1px solid var(--cpd-color-border-subtle-primary)" }}>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Node Controls: {selectedNodeId}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontWeight: 600 }}>Node Controls: {selectedNodeId}</div>
+                        <button
+                            type="button"
+                            onClick={() => setDetailOpen((v) => !v)}
+                            style={{
+                                padding: "2px 6px",
+                                borderRadius: 8,
+                                border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                background: "transparent",
+                            }}
+                        >
+                            {detailOpen ? "Hide Details" : "View Details"}
+                        </button>
+                    </div>
                     <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
                         session={String(controlState?.active_node_session_id || "-")} thread={String(controlState?.active_codex_thread_id || "-")}
                     </div>
+                    {detailOpen && (
+                        <div
+                            style={{
+                                marginBottom: 10,
+                                padding: 8,
+                                borderRadius: 8,
+                                border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                background: "var(--cpd-color-bg-subtle-secondary)",
+                                fontSize: 12,
+                                lineHeight: 1.45,
+                            }}
+                        >
+                            <div>node_id: {String(nodeDetail?.node_id || selectedNodeId)}</div>
+                            <div>display_name: {String(nodeDetail?.display_name || "-")}</div>
+                            <div>status: {String(nodeDetail?.status || "-")}</div>
+                            <div>last_seen: {nodeDetail?.last_seen ? new Date(nodeDetail.last_seen).toLocaleString() : "-"}</div>
+                            <div>matrix_user_id: {String(nodeDetail?.matrix_user_id || "-")}</div>
+                            <div>threads: {Number(nodeDetail?.threads_total || 0)} (archived {Number(nodeDetail?.threads_archived || 0)})</div>
+                            <div>
+                                runtime_profiles: {Number(nodeDetail?.runtime_profiles_total || 0)} (default {Number(nodeDetail?.runtime_profiles_default || 0)})
+                            </div>
+                        </div>
+                    )}
                     <div style={{ marginBottom: 8 }}>
                         <div style={{ fontWeight: 600, marginBottom: 4 }}>Threads</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
