@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useMemo, useState, type JSX } from "reac
 import { ChatFilter, IconButton } from "@vector-im/compound-web";
 import ChevronDownIcon from "@vector-im/compound-design-tokens/assets/web/icons/chevron-down";
 import { type RoomListItemSnapshot, RoomListItemView, RoomNotifState, type RoomItemViewModel } from "@element-hq/web-shared-components";
+import dis from "../../../../dispatcher/dispatcher";
+import { Action } from "../../../../dispatcher/actions";
 
 import BaseAvatar from "../../avatars/BaseAvatar";
 import { _t } from "../../../../languageHandler";
@@ -186,6 +188,14 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         return () => window.removeEventListener("hashchange", onHashChange);
     }, []);
 
+    const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
+        try {
+            window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify(detail || {}));
+        } catch {}
+        window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail }));
+        dis.dispatch({ action: Action.ViewHomePage });
+    }, []);
+
     const reloadNodes = useCallback(async (): Promise<void> => {
         setLoading(true);
         setError("");
@@ -248,25 +258,9 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     body: JSON.stringify({ node_id: id }),
                 });
                 const openBody = await openRes.json().catch(() => ({} as any));
-                let route = normalizeRoute(String(openBody?.matrix_room_route || ""));
-                if (!openBody?.ok || !route) {
-                    const response = await fetch(`/api/public/nodes/resolve-route?node_id=${encodeURIComponent(id)}`, {
-                        method: "GET",
-                        cache: "no-store",
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    const body = await response.json();
-                    if (!body?.ok || !body?.route) {
-                        throw new Error(String(body?.error || openBody?.error || "resolve_route_failed"));
-                    }
-                    route = normalizeRoute(String(body.route || ""));
+                if (!openBody?.ok) {
+                    throw new Error(String(openBody?.error || "open_node_session_failed"));
                 }
-                if (!route) {
-                    throw new Error("empty_route");
-                }
-                window.location.hash = route;
-                setActiveRoute(route);
-                void reloadNodes();
                 const [stRes, thRes, rpRes] = await Promise.all([
                     fetch(`/api/nodes/${encodeURIComponent(id)}/control-state`, {
                         method: "GET",
@@ -322,7 +316,9 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                 });
                 const detBody = await detRes.json().catch(() => ({} as any));
                 if (detBody?.ok && detBody?.item) {
-                    setNodeDetail(detBody.item as NodeDetailItem);
+                    const detail = detBody.item as NodeDetailItem;
+                    setNodeDetail(detail);
+                    publishNodeDetailToHome(detail);
                 } else {
                     setNodeDetail(null);
                 }
@@ -332,7 +328,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                 setResolvingNodeId("");
             }
         },
-        [reloadNodes],
+        [publishNodeDetailToHome],
     );
 
     const renderAvatar = useCallback((roomLike: unknown): React.ReactNode => {
