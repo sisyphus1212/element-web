@@ -8,102 +8,11 @@ Please see LICENSE files in the repository root for full details.
 import React, { useCallback, useEffect, useMemo, useState, type JSX } from "react";
 import { ChatFilter, IconButton } from "@vector-im/compound-web";
 import ChevronDownIcon from "@vector-im/compound-design-tokens/assets/web/icons/chevron-down";
-import { type RoomListItemSnapshot, RoomListItemView, RoomNotifState, type RoomItemViewModel } from "@element-hq/web-shared-components";
 
-import BaseAvatar from "../../avatars/BaseAvatar";
 import { _t } from "../../../../languageHandler";
-import SpaceStore from "../../../../stores/spaces/SpaceStore";
-import { MetaSpace } from "../../../../stores/spaces";
-
-type PeopleFilter = "all" | "online" | "offline";
-
-interface PeopleNodeItem {
-    node_id: string;
-    display_name: string;
-    status: string;
-    last_room_route: string;
-    matrix_user_id: string;
-}
-
-interface NodeControlState {
-    active_node_session_id: string;
-    active_codex_thread_id: string;
-    active_runtime_profile_id: string;
-    matrix_route?: { matrix_room_id?: string; matrix_thread_id?: string };
-}
-
-interface RuntimeProfileItem {
-    runtime_profile_id: string;
-    version: number;
-    is_default: boolean;
-    config?: Record<string, unknown>;
-}
-
-interface NodeDetailItem {
-    node_id: string;
-    display_name: string;
-    status: string;
-    last_seen: number;
-    matrix_user_id: string;
-    threads_total?: number;
-    threads_archived?: number;
-    runtime_profiles_total?: number;
-    runtime_profiles_default?: number;
-    control_state?: NodeControlState;
-}
-
-async function ensureManagerToken(): Promise<string> {
-    const readToken = (): string => {
-        try {
-            return String(window.localStorage.getItem("mgr_web_token") || "").trim();
-        } catch {
-            return "";
-        }
-    };
-    const writeToken = (token: string): void => {
-        try {
-            window.localStorage.setItem("mgr_web_token", token);
-        } catch {}
-    };
-    const cur = readToken();
-    if (cur) {
-        try {
-            const meRes = await fetch("/api/auth/me", {
-                method: "GET",
-                cache: "no-store",
-                headers: { Authorization: `Bearer ${cur}` },
-            });
-            if (meRes.ok) return cur;
-        } catch {}
-    }
-    const rep = await fetch("/api/auth/login", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: "manager", password: "admin" }),
-    });
-    const body = await rep.json().catch(() => ({} as any));
-    const tok = String((body as any)?.token || "").trim();
-    if (!tok) throw new Error(String((body as any)?.error || "auth_login_failed"));
-    writeToken(tok);
-    return tok;
-}
-
-function authHeaders(): Record<string, string> {
-    try {
-        const t = String(window.localStorage.getItem("mgr_web_token") || "").trim();
-        if (!t) return {};
-        return { Authorization: `Bearer ${t}` };
-    } catch {
-        return {};
-    }
-}
-
-function normalizeRoute(route: string): string {
-    const text = String(route || "").trim();
-    if (!text) return "";
-    return text.startsWith("#") ? text : `#${text}`;
-}
+import { applyRuntimeProfile, fetchPeopleNodes, loadNodeBundle, switchCodexThread } from "./people/api";
+import { PeopleNodeListItem } from "./people/PeopleNodeListItem";
+import type { NodeControlState, NodeDetailItem, PeopleFilter, PeopleNodeItem, RuntimeProfileItem } from "./people/types";
 
 function isOnline(status: string): boolean {
     return String(status || "").toLowerCase() === "online";
@@ -113,52 +22,6 @@ function matchesFilter(item: PeopleNodeItem, filter: PeopleFilter): boolean {
     if (filter === "all") return true;
     if (filter === "online") return isOnline(item.status);
     return !isOnline(item.status);
-}
-
-function makeSnapshot(item: PeopleNodeItem, pending: boolean): RoomListItemSnapshot {
-    return {
-        id: item.node_id,
-        room: item,
-        name: item.display_name,
-        isBold: isOnline(item.status),
-        messagePreview: pending ? _t("common|loading") : `@${item.node_id}`,
-        notification: {
-            hasAnyNotificationOrActivity: false,
-            isUnsentMessage: false,
-            invited: false,
-            isMention: false,
-            isActivityNotification: false,
-            isNotification: false,
-            hasUnreadCount: false,
-            count: 0,
-            muted: !isOnline(item.status),
-        },
-        showMoreOptionsMenu: false,
-        showNotificationMenu: false,
-        isFavourite: false,
-        isLowPriority: false,
-        canInvite: false,
-        canCopyRoomLink: false,
-        canMarkAsRead: false,
-        canMarkAsUnread: false,
-        roomNotifState: RoomNotifState.AllMessages,
-    };
-}
-
-function makeVm(snapshot: RoomListItemSnapshot, onOpen: () => void): RoomItemViewModel {
-    return {
-        getSnapshot: () => snapshot,
-        subscribe: () => () => undefined,
-        onOpenRoom: onOpen,
-        onMarkAsRead: () => undefined,
-        onMarkAsUnread: () => undefined,
-        onToggleFavorite: () => undefined,
-        onToggleLowPriority: () => undefined,
-        onInvite: () => undefined,
-        onCopyRoomLink: () => undefined,
-        onLeaveRoom: () => undefined,
-        onSetRoomNotifState: () => undefined,
-    };
 }
 
 export const PeopleRoomListView: React.FC = (): JSX.Element => {
@@ -186,28 +49,10 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch("/api/public/nodes", {
-                method: "GET",
-                cache: "no-store",
-                headers: authHeaders(),
-            });
-            const body = await response.json();
-            if (!body?.ok || !Array.isArray(body.items)) {
-                throw new Error(String(body?.error || "invalid_nodes_payload"));
-            }
-            const rows = body.items
-                .map((it: any): PeopleNodeItem => ({
-                    node_id: String(it?.node_id || ""),
-                    display_name: String(it?.display_name || it?.node_id || ""),
-                    status: String(it?.status || "offline"),
-                    last_room_route: normalizeRoute(String(it?.last_room_route || "")),
-                    matrix_user_id: String(it?.matrix_user_id || ""),
-                }))
-                .filter((it: PeopleNodeItem) => it.node_id);
+            const rows = await fetchPeopleNodes();
             setItems(rows);
         } catch (e) {
-            const message = `People nodes load failed: ${String((e as Error)?.message || e)}`;
-            setError(message);
+            setError(`People nodes load failed: ${String((e as Error)?.message || e)}`);
         } finally {
             setLoading(false);
         }
@@ -232,102 +77,24 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         async (nodeId: string) => {
             const id = String(nodeId || "");
             if (!id) return;
-            ensurePeopleSpaceActive();
             setResolvingNodeId(id);
             setSelectedNodeId(id);
             setError("");
             try {
-                const token = await ensureManagerToken();
-                const [stRes, thRes, rpRes] = await Promise.all([
-                    fetch(`/api/nodes/${encodeURIComponent(id)}/control-state`, {
-                        method: "GET",
-                        cache: "no-store",
-                        headers: { Authorization: `Bearer ${token}` },
-                    }),
-                    fetch(`/api/nodes/${encodeURIComponent(id)}/codex-threads`, {
-                        method: "GET",
-                        cache: "no-store",
-                        headers: { Authorization: `Bearer ${token}` },
-                    }),
-                    fetch(`/api/nodes/${encodeURIComponent(id)}/runtime-profiles`, {
-                        method: "GET",
-                        cache: "no-store",
-                        headers: { Authorization: `Bearer ${token}` },
-                    }),
-                ]);
-                const stBody = await stRes.json().catch(() => ({} as any));
-                const thBody = await thRes.json().catch(() => ({} as any));
-                const rpBody = await rpRes.json().catch(() => ({} as any));
-                if (stBody?.ok && stBody?.state) {
-                    setControlState(stBody.state as NodeControlState);
-                } else {
-                    setControlState(null);
-                }
-                if (thBody?.ok && Array.isArray(thBody.items)) {
-                    setThreadItems(
-                        thBody.items.map((x: any) => ({
-                            codex_thread_id: String(x?.codex_thread_id || ""),
-                            title: String(x?.title || ""),
-                            archived: Boolean(x?.archived),
-                        })).filter((x: any) => x.codex_thread_id),
-                    );
-                } else {
-                    setThreadItems([]);
-                }
-                if (rpBody?.ok && Array.isArray(rpBody.items)) {
-                    setRuntimeProfiles(
-                        rpBody.items.map((x: any) => ({
-                            runtime_profile_id: String(x?.runtime_profile_id || ""),
-                            version: Number(x?.version || 0),
-                            is_default: Boolean(x?.is_default),
-                            config: (x?.config && typeof x.config === "object") ? x.config : {},
-                        })).filter((x: any) => x.runtime_profile_id),
-                    );
-                } else {
-                    setRuntimeProfiles([]);
-                }
-                const detRes = await fetch(`/api/nodes/${encodeURIComponent(id)}/details`, {
-                    method: "GET",
-                    cache: "no-store",
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const detBody = await detRes.json().catch(() => ({} as any));
-                if (detBody?.ok && detBody?.item) {
-                    const detail = detBody.item as NodeDetailItem;
-                    setNodeDetail(detail);
-                    publishNodeDetailToHome(detail);
-                } else {
-                    setNodeDetail(null);
-                }
+                const bundle = await loadNodeBundle(id);
+                setControlState(bundle.controlState);
+                setThreadItems(bundle.threadItems);
+                setRuntimeProfiles(bundle.runtimeProfiles);
+                setNodeDetail(bundle.nodeDetail);
+                if (bundle.nodeDetail) publishNodeDetailToHome(bundle.nodeDetail);
             } catch (e) {
                 setError(`Load node details failed: ${String((e as Error)?.message || e)}`);
             } finally {
                 setResolvingNodeId("");
-                // Guard against accidental space switch caused by shared room-list events.
-                setTimeout(() => ensurePeopleSpaceActive(), 0);
-                setTimeout(() => ensurePeopleSpaceActive(), 120);
             }
         },
-        [publishNodeDetailToHome, ensurePeopleSpaceActive],
+        [publishNodeDetailToHome],
     );
-
-    const renderAvatar = useCallback((roomLike: unknown): React.ReactNode => {
-        const node = roomLike as PeopleNodeItem;
-        return <BaseAvatar name={String(node?.display_name || "node")} idName={String(node?.node_id || "node")} size="32px" />;
-    }, []);
-
-    const onPeopleItemMouseDownCapture = useCallback((ev: React.MouseEvent, nodeId: string): void => {
-        // Hard-stop default RoomListItem open-room behavior for People items.
-        ev.preventDefault();
-        ev.stopPropagation();
-        void onSelectNode(nodeId);
-    }, [onSelectNode]);
-
-    const onPeopleItemClickCapture = useCallback((ev: React.MouseEvent): void => {
-        // Keep click from bubbling into native room-open handlers.
-        ev.preventDefault();
-        ev.stopPropagation();
-    }, []);
 
     return (
         <>
@@ -365,31 +132,17 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                 ) : visibleItems.length === 0 ? (
                     <div className="mx_RoomSublist_empty">{_t("common|no_results")}</div>
                 ) : (
-                    visibleItems.map((it, index) => {
-                        const selected = selectedNodeId !== "" && it.node_id === selectedNodeId;
-                        const pending = resolvingNodeId === it.node_id;
-                        const snapshot = makeSnapshot(it, pending);
-                        const vm = makeVm(snapshot, () => {
-                            void onSelectNode(it.node_id);
-                        });
-                        return (
-                            <div
-                                key={it.node_id}
-                                onMouseDownCapture={(ev) => onPeopleItemMouseDownCapture(ev, it.node_id)}
-                                onClickCapture={onPeopleItemClickCapture}
-                            >
-                                <RoomListItemView
-                                    vm={vm}
-                                    isSelected={selected}
-                                    isFocused={false}
-                                    onFocus={() => undefined}
-                                    roomIndex={index}
-                                    roomCount={visibleItems.length}
-                                    renderAvatar={renderAvatar}
-                                />
-                            </div>
-                        );
-                    })
+                    visibleItems.map((it, index) => (
+                        <PeopleNodeListItem
+                            key={it.node_id}
+                            item={it}
+                            selected={selectedNodeId === it.node_id}
+                            pending={resolvingNodeId === it.node_id}
+                            index={index}
+                            count={visibleItems.length}
+                            onSelect={(id) => void onSelectNode(id)}
+                        />
+                    ))
                 )}
             </div>
             {selectedNodeId && (
@@ -445,17 +198,9 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                                     disabled={t.archived}
                                     onClick={async () => {
                                         try {
-                                            const token = await ensureManagerToken();
                                             const nsid = String(controlState?.active_node_session_id || "").trim();
                                             if (!nsid) throw new Error("missing_active_node_session_id");
-                                            const rep = await fetch(`/api/node-sessions/${encodeURIComponent(nsid)}/switch-codex-thread`, {
-                                                method: "POST",
-                                                cache: "no-store",
-                                                headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-                                                body: JSON.stringify({ codex_thread_id: t.codex_thread_id }),
-                                            });
-                                            const body = await rep.json().catch(() => ({} as any));
-                                            if (!body?.ok) throw new Error(String(body?.error || "switch_thread_failed"));
+                                            await switchCodexThread(nsid, t.codex_thread_id);
                                             setControlState((prev) => ({ ...(prev || ({} as NodeControlState)), active_codex_thread_id: t.codex_thread_id }));
                                         } catch (e) {
                                             setError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
@@ -485,17 +230,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                                     type="button"
                                     onClick={async () => {
                                         try {
-                                            const token = await ensureManagerToken();
-                                            const rep = await fetch(
-                                                `/api/nodes/${encodeURIComponent(selectedNodeId)}/runtime-profiles/${encodeURIComponent(rp.runtime_profile_id)}/apply`,
-                                                {
-                                                    method: "POST",
-                                                    cache: "no-store",
-                                                    headers: { Authorization: `Bearer ${token}` },
-                                                },
-                                            );
-                                            const body = await rep.json().catch(() => ({} as any));
-                                            if (!body?.ok) throw new Error(String(body?.error || "apply_runtime_profile_failed"));
+                                            await applyRuntimeProfile(selectedNodeId, rp.runtime_profile_id);
                                             setRuntimeProfiles((prev) => prev.map((x) => ({ ...x, is_default: x.runtime_profile_id === rp.runtime_profile_id })));
                                         } catch (e) {
                                             setError(`Apply runtime profile failed: ${String((e as Error)?.message || e)}`);
@@ -518,8 +253,3 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         </>
     );
 };
-    const ensurePeopleSpaceActive = useCallback((): void => {
-        try {
-            SpaceStore.instance.setActiveSpace(MetaSpace.People, false);
-        } catch {}
-    }, []);
