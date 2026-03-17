@@ -918,6 +918,10 @@ export class SpaceStoreClass extends AsyncStoreWithClient<EmptyObject> {
 
     private switchSpaceIfNeeded = (roomId = SdkContextClass.instance.roomViewStore.getRoomId()): void => {
         if (!roomId) return;
+        // Product rule for manager node UX:
+        // when user is in People metaspace, do not auto-switch to another
+        // space on ViewRoom side effects. People selection should stay in-place.
+        if (this.activeSpace === MetaSpace.People) return;
         if (!this.isRoomInSpace(this.activeSpace, roomId) && !this.matrixClient?.getRoom(roomId)?.isSpaceRoom()) {
             this.switchToRelatedSpace(roomId);
         }

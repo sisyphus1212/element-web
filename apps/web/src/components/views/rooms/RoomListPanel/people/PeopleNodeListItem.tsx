@@ -1,3 +1,10 @@
+/*
+Copyright 2026 New Vector Ltd.
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
 import React from "react";
 
 import BaseAvatar from "../../../avatars/BaseAvatar";
@@ -26,7 +33,11 @@ export const PeopleNodeListItem: React.FC<Props> = ({ item, selected, pending, i
             aria-selected={selected}
             aria-label={`Select node ${item.display_name}`}
             data-people-node-id={item.node_id}
-            className="mx_RoomListItemView"
+            className="mx_PeopleNodeListItem"
+            onMouseDown={(ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }}
             onClick={(ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();

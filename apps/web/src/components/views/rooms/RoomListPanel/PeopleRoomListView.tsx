@@ -126,7 +126,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
 
             {error && <div className="mx_InlineError">{error}</div>}
 
-            <div data-testid="room-list" role="listbox" aria-label={_t("room_list|list_title")} style={{ height: "100%", overflowY: "auto" }}>
+            <div data-testid="people-list" role="listbox" aria-label={_t("common|people")} style={{ height: "100%", overflowY: "auto" }}>
                 {loading ? (
                     <div className="mx_RoomSublist_empty">{_t("common|loading")}</div>
                 ) : visibleItems.length === 0 ? (
