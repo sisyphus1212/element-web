@@ -37,29 +37,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
     const [nodeDetail, setNodeDetail] = useState<NodeDetailItem | null>(null);
     const [detailOpen, setDetailOpen] = useState<boolean>(false);
-    const [rowClassTemplate, setRowClassTemplate] = useState<{
-        selected: string;
-        unselected: string;
-        first: string;
-        last: string;
-        container: string;
-        content: string;
-        ellipsis: string;
-        roomName: string;
-        hoverMenu: string;
-        notificationDecoration: string;
-    }>({
-        selected: "mx_RoomListItemView mx_RoomListItemView_selected",
-        unselected: "mx_RoomListItemView",
-        first: "",
-        last: "",
-        container: "",
-        content: "",
-        ellipsis: "",
-        roomName: "",
-        hoverMenu: "",
-        notificationDecoration: "",
-    });
 
     const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
         try {
@@ -84,60 +61,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     useEffect(() => {
         void reloadNodes();
     }, [reloadNodes]);
-
-    useEffect(() => {
-        const normalizeRowClass = (value: string, selected: boolean): string => {
-            const parts = String(value || "")
-                .split(/\s+/)
-                .filter(Boolean)
-                .filter((c) => !c.includes("firstItem") && !c.includes("lastItem"))
-                .filter((c) => !c.includes("_bold_"));
-            const withoutSelected = parts.filter((c) => !c.includes("_selected_") && c !== "mx_RoomListItemView_selected");
-            if (!selected) return withoutSelected.join(" ");
-            const selectedToken = parts.find((c) => c.includes("_selected_"));
-            const merged = [...withoutSelected];
-            if (selectedToken && !merged.includes(selectedToken)) merged.push(selectedToken);
-            if (!merged.includes("mx_RoomListItemView_selected")) merged.push("mx_RoomListItemView_selected");
-            return merged.join(" ");
-        };
-
-        const pickRow = (selected: boolean): HTMLButtonElement | null => {
-            const rows = Array.from(document.querySelectorAll("[data-testid='room-list'] button[role='option']")) as HTMLButtonElement[];
-            return rows.find((r) => String(r.getAttribute("aria-selected") || "") === String(selected)) || rows[0] || null;
-        };
-        const selectedRow = pickRow(true);
-        const unselectedRow = pickRow(false);
-        if (!selectedRow && !unselectedRow) return;
-        const selectedClassRaw = String((selectedRow || unselectedRow)?.className || "").trim();
-        const unselectedClassRaw = String((unselectedRow || selectedRow)?.className || "").trim();
-        const selectedClass = normalizeRowClass(selectedClassRaw, true);
-        const unselectedClass = normalizeRowClass(unselectedClassRaw, false);
-        const firstClass = (selectedClass.split(/\s+/).find((c) => c.includes("firstItem")) ||
-            unselectedClass.split(/\s+/).find((c) => c.includes("firstItem")) ||
-            "");
-        const lastClass = (selectedClass.split(/\s+/).find((c) => c.includes("lastItem")) ||
-            unselectedClass.split(/\s+/).find((c) => c.includes("lastItem")) ||
-            "");
-        const sample = (selectedRow || unselectedRow) as HTMLElement;
-        const container = String(sample?.querySelector("div")?.className || "");
-        const content = String(sample?.querySelector("[class*='content']")?.className || "");
-        const ellipsis = String(sample?.querySelector("[class*='ellipsis']")?.className || "");
-        const roomName = String(sample?.querySelector("[data-testid='room-name']")?.className || "");
-        const hoverMenu = String(sample?.querySelector("[class*='hoverMenu']")?.className || "");
-        const notificationDecoration = String(sample?.querySelector("[class*='notificationDecoration']")?.className || "");
-        setRowClassTemplate({
-            selected: selectedClass || "mx_RoomListItemView mx_RoomListItemView_selected",
-            unselected: unselectedClass || "mx_RoomListItemView",
-            first: firstClass,
-            last: lastClass,
-            container,
-            content,
-            ellipsis,
-            roomName,
-            hoverMenu,
-            notificationDecoration,
-        });
-    }, [items.length]);
 
     const visibleItems = useMemo(() => {
         return items
@@ -218,16 +141,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                             index={index}
                             count={visibleItems.length}
                             onSelect={(id) => void onSelectNode(id)}
-                            selectedClassName={rowClassTemplate.selected}
-                            unselectedClassName={rowClassTemplate.unselected}
-                            firstClassName={rowClassTemplate.first}
-                            lastClassName={rowClassTemplate.last}
-                            containerClassName={rowClassTemplate.container}
-                            contentClassName={rowClassTemplate.content}
-                            ellipsisClassName={rowClassTemplate.ellipsis}
-                            roomNameClassName={rowClassTemplate.roomName}
-                            hoverMenuClassName={rowClassTemplate.hoverMenu}
-                            notificationDecorationClassName={rowClassTemplate.notificationDecoration}
                         />
                     ))
                 )}
