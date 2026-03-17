@@ -99,12 +99,6 @@ function authHeaders(): Record<string, string> {
     }
 }
 
-function currentHashRoute(): string {
-    const raw = String(window.location.hash || "").trim();
-    if (!raw) return "";
-    return raw.startsWith("#") ? raw : `#${raw}`;
-}
-
 function normalizeRoute(route: string): string {
     const text = String(route || "").trim();
     if (!text) return "";
@@ -173,7 +167,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [resolvingNodeId, setResolvingNodeId] = useState<string>("");
     const [filter, setFilter] = useState<PeopleFilter>("all");
     const [error, setError] = useState<string>("");
-    const [activeRoute, setActiveRoute] = useState<string>(currentHashRoute());
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedNodeId, setSelectedNodeId] = useState<string>("");
     const [controlState, setControlState] = useState<NodeControlState | null>(null);
@@ -181,12 +174,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
     const [nodeDetail, setNodeDetail] = useState<NodeDetailItem | null>(null);
     const [detailOpen, setDetailOpen] = useState<boolean>(false);
-
-    useEffect(() => {
-        const onHashChange = (): void => setActiveRoute(currentHashRoute());
-        window.addEventListener("hashchange", onHashChange);
-        return () => window.removeEventListener("hashchange", onHashChange);
-    }, []);
 
     const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
         try {
@@ -242,7 +229,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             });
     }, [items, filter]);
 
-    const onOpenNode = useCallback(
+    const onSelectNode = useCallback(
         async (nodeId: string) => {
             const id = String(nodeId || "");
             if (!id) return;
@@ -251,16 +238,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             setError("");
             try {
                 const token = await ensureManagerToken();
-                const openRes = await fetch("/api/node-sessions/open", {
-                    method: "POST",
-                    cache: "no-store",
-                    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-                    body: JSON.stringify({ node_id: id }),
-                });
-                const openBody = await openRes.json().catch(() => ({} as any));
-                if (!openBody?.ok) {
-                    throw new Error(String(openBody?.error || "open_node_session_failed"));
-                }
                 const [stRes, thRes, rpRes] = await Promise.all([
                     fetch(`/api/nodes/${encodeURIComponent(id)}/control-state`, {
                         method: "GET",
@@ -323,7 +300,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     setNodeDetail(null);
                 }
             } catch (e) {
-                setError(`Open node failed: ${String((e as Error)?.message || e)}`);
+                setError(`Load node details failed: ${String((e as Error)?.message || e)}`);
             } finally {
                 setResolvingNodeId("");
             }
@@ -373,12 +350,11 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     <div className="mx_RoomSublist_empty">{_t("common|no_results")}</div>
                 ) : (
                     visibleItems.map((it, index) => {
-                        const route = normalizeRoute(it.last_room_route);
-                        const selected = route !== "" && route === activeRoute;
+                        const selected = selectedNodeId !== "" && it.node_id === selectedNodeId;
                         const pending = resolvingNodeId === it.node_id;
                         const snapshot = makeSnapshot(it, pending);
                         const vm = makeVm(snapshot, () => {
-                            void onOpenNode(it.node_id);
+                            void onSelectNode(it.node_id);
                         });
                         return (
                             <RoomListItemView
