@@ -9,8 +9,6 @@ import React, { useCallback, useEffect, useMemo, useState, type JSX } from "reac
 import { ChatFilter, IconButton } from "@vector-im/compound-web";
 import ChevronDownIcon from "@vector-im/compound-design-tokens/assets/web/icons/chevron-down";
 import { type RoomListItemSnapshot, RoomListItemView, RoomNotifState, type RoomItemViewModel } from "@element-hq/web-shared-components";
-import dis from "../../../../dispatcher/dispatcher";
-import { Action } from "../../../../dispatcher/actions";
 
 import BaseAvatar from "../../avatars/BaseAvatar";
 import { _t } from "../../../../languageHandler";
@@ -180,7 +178,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify(detail || {}));
         } catch {}
         window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail }));
-        dis.dispatch({ action: Action.ViewHomePage });
     }, []);
 
     const reloadNodes = useCallback(async (): Promise<void> => {
