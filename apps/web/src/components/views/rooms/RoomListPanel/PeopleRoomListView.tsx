@@ -12,6 +12,8 @@ import { type RoomListItemSnapshot, RoomListItemView, RoomNotifState, type RoomI
 
 import BaseAvatar from "../../avatars/BaseAvatar";
 import { _t } from "../../../../languageHandler";
+import SpaceStore from "../../../../stores/spaces/SpaceStore";
+import { MetaSpace } from "../../../../stores/spaces";
 
 type PeopleFilter = "all" | "online" | "offline";
 
@@ -230,6 +232,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         async (nodeId: string) => {
             const id = String(nodeId || "");
             if (!id) return;
+            ensurePeopleSpaceActive();
             setResolvingNodeId(id);
             setSelectedNodeId(id);
             setError("");
@@ -300,14 +303,30 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                 setError(`Load node details failed: ${String((e as Error)?.message || e)}`);
             } finally {
                 setResolvingNodeId("");
+                // Guard against accidental space switch caused by shared room-list events.
+                setTimeout(() => ensurePeopleSpaceActive(), 0);
+                setTimeout(() => ensurePeopleSpaceActive(), 120);
             }
         },
-        [publishNodeDetailToHome],
+        [publishNodeDetailToHome, ensurePeopleSpaceActive],
     );
 
     const renderAvatar = useCallback((roomLike: unknown): React.ReactNode => {
         const node = roomLike as PeopleNodeItem;
         return <BaseAvatar name={String(node?.display_name || "node")} idName={String(node?.node_id || "node")} size="32px" />;
+    }, []);
+
+    const onPeopleItemMouseDownCapture = useCallback((ev: React.MouseEvent, nodeId: string): void => {
+        // Hard-stop default RoomListItem open-room behavior for People items.
+        ev.preventDefault();
+        ev.stopPropagation();
+        void onSelectNode(nodeId);
+    }, [onSelectNode]);
+
+    const onPeopleItemClickCapture = useCallback((ev: React.MouseEvent): void => {
+        // Keep click from bubbling into native room-open handlers.
+        ev.preventDefault();
+        ev.stopPropagation();
     }, []);
 
     return (
@@ -354,16 +373,21 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                             void onSelectNode(it.node_id);
                         });
                         return (
-                            <RoomListItemView
+                            <div
                                 key={it.node_id}
-                                vm={vm}
-                                isSelected={selected}
-                                isFocused={false}
-                                onFocus={() => undefined}
-                                roomIndex={index}
-                                roomCount={visibleItems.length}
-                                renderAvatar={renderAvatar}
-                            />
+                                onMouseDownCapture={(ev) => onPeopleItemMouseDownCapture(ev, it.node_id)}
+                                onClickCapture={onPeopleItemClickCapture}
+                            >
+                                <RoomListItemView
+                                    vm={vm}
+                                    isSelected={selected}
+                                    isFocused={false}
+                                    onFocus={() => undefined}
+                                    roomIndex={index}
+                                    roomCount={visibleItems.length}
+                                    renderAvatar={renderAvatar}
+                                />
+                            </div>
                         );
                     })
                 )}
@@ -494,3 +518,8 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         </>
     );
 };
+    const ensurePeopleSpaceActive = useCallback((): void => {
+        try {
+            SpaceStore.instance.setActiveSpace(MetaSpace.People, false);
+        } catch {}
+    }, []);
