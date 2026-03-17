@@ -24,7 +24,7 @@ rsync -a --delete \
 
 # 2) Detect active bundle hash directories referenced by html/json/js entry files.
 mapfile -t ACTIVE_HASHES < <(
-  rg -o "bundles/[a-f0-9]{20,}" \
+  rg --no-filename -o "bundles/[a-f0-9]{20,}" \
     "$SRC_DIR"/*.html \
     "$SRC_DIR"/*.json \
     "$SRC_DIR"/*.js \
@@ -53,4 +53,3 @@ echo "SRC: $SRC_DIR"
 echo "OUT: $OUT_DIR"
 du -sh "$SRC_DIR" "$OUT_DIR"
 find "$OUT_DIR" -type f | wc -l | awk '{print "FILES:", $1}'
-
