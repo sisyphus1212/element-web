@@ -21,6 +21,12 @@ type Props = {
     unselectedClassName: string;
     firstClassName?: string;
     lastClassName?: string;
+    containerClassName?: string;
+    contentClassName?: string;
+    ellipsisClassName?: string;
+    roomNameClassName?: string;
+    hoverMenuClassName?: string;
+    notificationDecorationClassName?: string;
 };
 
 function isOnline(status: string): boolean {
@@ -38,6 +44,12 @@ export const PeopleNodeListItem: React.FC<Props> = ({
     unselectedClassName,
     firstClassName,
     lastClassName,
+    containerClassName,
+    contentClassName,
+    ellipsisClassName,
+    roomNameClassName,
+    hoverMenuClassName,
+    notificationDecorationClassName,
 }) => {
     const edgeClass =
         `${index === 0 && firstClassName ? ` ${firstClassName}` : ""}` +
@@ -64,18 +76,20 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 onSelect(item.node_id);
             }}
         >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <div className={containerClassName || ""}>
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
-                <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: isOnline(item.status) ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.display_name}
+                <div className={contentClassName || ""}>
+                    <div className={ellipsisClassName || ""}>
+                        <div className={roomNameClassName || ""} title={item.display_name} data-testid="room-name">
+                            {item.display_name}
+                        </div>
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        @{item.node_id}
+                    <div className={hoverMenuClassName || ""} />
+                    <div className={notificationDecorationClassName || ""} aria-hidden={true}>
+                        {pending ? <span style={{ fontSize: 11, opacity: 0.7 }}>Loading…</span> : null}
                     </div>
                 </div>
             </div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>{pending ? "Loading…" : item.status}</div>
         </button>
     );
 };
