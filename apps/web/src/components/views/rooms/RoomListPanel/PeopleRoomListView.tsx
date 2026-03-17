@@ -37,6 +37,17 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
     const [nodeDetail, setNodeDetail] = useState<NodeDetailItem | null>(null);
     const [detailOpen, setDetailOpen] = useState<boolean>(false);
+    const [rowClassTemplate, setRowClassTemplate] = useState<{
+        selected: string;
+        unselected: string;
+        first: string;
+        last: string;
+    }>({
+        selected: "mx_RoomListItemView mx_RoomListItemView_selected",
+        unselected: "mx_RoomListItemView",
+        first: "",
+        last: "",
+    });
 
     const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
         try {
@@ -61,6 +72,30 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     useEffect(() => {
         void reloadNodes();
     }, [reloadNodes]);
+
+    useEffect(() => {
+        const pickRow = (selected: boolean): HTMLButtonElement | null => {
+            const rows = Array.from(document.querySelectorAll("[data-testid='room-list'] button[role='option']")) as HTMLButtonElement[];
+            return rows.find((r) => String(r.getAttribute("aria-selected") || "") === String(selected)) || rows[0] || null;
+        };
+        const selectedRow = pickRow(true);
+        const unselectedRow = pickRow(false);
+        if (!selectedRow && !unselectedRow) return;
+        const selectedClass = String((selectedRow || unselectedRow)?.className || "").trim();
+        const unselectedClass = String((unselectedRow || selectedRow)?.className || "").trim();
+        const firstClass = (selectedClass.split(/\s+/).find((c) => c.includes("firstItem")) ||
+            unselectedClass.split(/\s+/).find((c) => c.includes("firstItem")) ||
+            "");
+        const lastClass = (selectedClass.split(/\s+/).find((c) => c.includes("lastItem")) ||
+            unselectedClass.split(/\s+/).find((c) => c.includes("lastItem")) ||
+            "");
+        setRowClassTemplate({
+            selected: selectedClass || "mx_RoomListItemView mx_RoomListItemView_selected",
+            unselected: unselectedClass || "mx_RoomListItemView",
+            first: firstClass,
+            last: lastClass,
+        });
+    }, [items.length]);
 
     const visibleItems = useMemo(() => {
         return items
@@ -141,6 +176,10 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                             index={index}
                             count={visibleItems.length}
                             onSelect={(id) => void onSelectNode(id)}
+                            selectedClassName={rowClassTemplate.selected}
+                            unselectedClassName={rowClassTemplate.unselected}
+                            firstClassName={rowClassTemplate.first}
+                            lastClassName={rowClassTemplate.last}
                         />
                     ))
                 )}

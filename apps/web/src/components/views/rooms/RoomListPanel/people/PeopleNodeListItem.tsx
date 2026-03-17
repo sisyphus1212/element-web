@@ -17,13 +17,33 @@ type Props = {
     index: number;
     count: number;
     onSelect: (nodeId: string) => void;
+    selectedClassName: string;
+    unselectedClassName: string;
+    firstClassName?: string;
+    lastClassName?: string;
 };
 
 function isOnline(status: string): boolean {
     return String(status || "").toLowerCase() === "online";
 }
 
-export const PeopleNodeListItem: React.FC<Props> = ({ item, selected, pending, index, count, onSelect }) => {
+export const PeopleNodeListItem: React.FC<Props> = ({
+    item,
+    selected,
+    pending,
+    index,
+    count,
+    onSelect,
+    selectedClassName,
+    unselectedClassName,
+    firstClassName,
+    lastClassName,
+}) => {
+    const edgeClass =
+        `${index === 0 && firstClassName ? ` ${firstClassName}` : ""}` +
+        `${index === count - 1 && lastClassName ? ` ${lastClassName}` : ""}`;
+    const rowClass = `${selected ? selectedClassName : unselectedClassName}${edgeClass}`;
+
     return (
         <button
             type="button"
@@ -33,7 +53,7 @@ export const PeopleNodeListItem: React.FC<Props> = ({ item, selected, pending, i
             aria-selected={selected}
             aria-label={`Select node ${item.display_name}`}
             data-people-node-id={item.node_id}
-            className="mx_PeopleNodeListItem"
+            className={rowClass}
             onMouseDown={(ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -42,18 +62,6 @@ export const PeopleNodeListItem: React.FC<Props> = ({ item, selected, pending, i
                 ev.preventDefault();
                 ev.stopPropagation();
                 onSelect(item.node_id);
-            }}
-            style={{
-                display: "flex",
-                width: "100%",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 12px",
-                border: "none",
-                borderRadius: 8,
-                background: selected ? "var(--cpd-color-bg-canvas-default)" : "transparent",
-                textAlign: "left",
-                cursor: "pointer",
             }}
         >
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
