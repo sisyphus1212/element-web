@@ -385,14 +385,18 @@ export default class LeftPanel extends React.Component<IProps, IState> {
 
     public render(): React.ReactNode {
         const useNewRoomList = SettingsStore.getValue("feature_new_room_list");
+        // Keep legacy room list for most spaces, but force People to use
+        // the new panel so node rows follow the custom detail-only flow.
+        const usePeoplePanel = this.state.activeSpace === MetaSpace.People;
+        const usePanel = useNewRoomList || usePeoplePanel;
         const containerClasses = classNames({
             mx_LeftPanel: true,
-            mx_LeftPanel_newRoomList: useNewRoomList,
+            mx_LeftPanel_newRoomList: usePanel,
             mx_LeftPanel_minimized: this.props.isMinimized,
         });
 
         const roomListClasses = classNames("mx_LeftPanel_actualRoomListContainer", "mx_AutoHideScrollbar");
-        if (useNewRoomList) {
+        if (usePanel) {
             return (
                 <div className={containerClasses}>
                     <div className="mx_LeftPanel_roomListContainer">
