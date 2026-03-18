@@ -88,14 +88,19 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
                 <div className={classNames(roomListItemStyles.content, contentClassName)}>
                     <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
-                        <div className={classNames(roomListItemStyles.roomName, roomNameClassName)} title={nodeId} data-testid="room-name">
-                            {nodeId}
+                        <div
+                            className={classNames(roomListItemStyles.roomName, roomNameClassName)}
+                            title={showHostLabel ? `${nodeId} (${hostLabel})` : nodeId}
+                            data-testid="room-name"
+                            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
+                        >
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nodeId}</span>
+                            {showHostLabel ? (
+                                <span style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {hostLabel}
+                                </span>
+                            ) : null}
                         </div>
-                        {showHostLabel ? (
-                            <div title={hostLabel} style={{ fontSize: 12, opacity: 0.75 }}>
-                                {hostLabel}
-                            </div>
-                        ) : null}
                     </div>
                     <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
                     <div className={classNames(roomListItemStyles.notificationDecoration, notificationDecorationClassName)} aria-hidden={true}>
