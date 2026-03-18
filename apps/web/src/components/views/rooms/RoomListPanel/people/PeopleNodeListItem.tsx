@@ -85,9 +85,15 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 onSelect(item.node_id);
             }}
         >
-            <div className={classNames(roomListItemStyles.container, containerClassName)}>
+            <div
+                className={classNames(roomListItemStyles.container, containerClassName)}
+                style={{ display: "flex", alignItems: "center", minWidth: 0 }}
+            >
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
-                <div className={classNames(roomListItemStyles.content, contentClassName)}>
+                <div
+                    className={classNames(roomListItemStyles.content, contentClassName)}
+                    style={{ display: "flex", alignItems: "center", minWidth: 0 }}
+                >
                     <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
                         <div
                             className={classNames(roomListItemStyles.roomName, roomNameClassName)}
