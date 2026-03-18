@@ -32,18 +32,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [error, setError] = useState<string>("");
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedNodeId, setSelectedNodeId] = useState<string>("");
-    const [classTpl, setClassTpl] = useState<{
-        selectedClassName?: string;
-        unselectedClassName?: string;
-        firstClassName?: string;
-        lastClassName?: string;
-        containerClassName?: string;
-        contentClassName?: string;
-        ellipsisClassName?: string;
-        roomNameClassName?: string;
-        hoverMenuClassName?: string;
-        notificationDecorationClassName?: string;
-    }>({});
 
     const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
         try {
@@ -68,41 +56,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     useEffect(() => {
         void reloadNodes();
     }, [reloadNodes]);
-
-    useEffect(() => {
-        const pickToken = (className: string, marker: string): string | undefined => {
-            const t = String(className || "")
-                .split(/\s+/)
-                .find((c) => c.includes(marker));
-            return t || undefined;
-        };
-        const pickRow = (selected: boolean): HTMLButtonElement | null => {
-            const rows = Array.from(document.querySelectorAll<HTMLButtonElement>("button.mx_RoomListItemView[aria-label^='Open room']"));
-            return rows.find((r) => String(r.getAttribute("aria-selected") || "") === String(selected)) || rows[0] || null;
-        };
-        const selectedRow = pickRow(true);
-        const unselectedRow = pickRow(false);
-        const baseRow = selectedRow || unselectedRow;
-        if (!baseRow) return;
-        const container = baseRow.querySelector(":scope > div") as HTMLDivElement | null;
-        const content = container?.querySelector(":scope > div") as HTMLDivElement | null;
-        const ellipsis = content?.querySelector(":scope > div") as HTMLDivElement | null;
-        const roomName = ellipsis?.querySelector("[data-testid='room-name']") as HTMLDivElement | null;
-        const hoverMenu = content?.querySelector(":scope > div:nth-child(2)") as HTMLDivElement | null;
-        const notificationDecoration = content?.querySelector(":scope > div:last-child") as HTMLDivElement | null;
-        setClassTpl({
-            selectedClassName: String(selectedRow?.className || "").trim() || undefined,
-            unselectedClassName: String(unselectedRow?.className || "").trim() || undefined,
-            firstClassName: pickToken(String(baseRow.className || ""), "_firstItem_"),
-            lastClassName: pickToken(String(baseRow.className || ""), "_lastItem_"),
-            containerClassName: String(container?.className || "").trim() || undefined,
-            contentClassName: String(content?.className || "").trim() || undefined,
-            ellipsisClassName: String(ellipsis?.className || "").trim() || undefined,
-            roomNameClassName: String(roomName?.className || "").trim() || undefined,
-            hoverMenuClassName: String(hoverMenu?.className || "").trim() || undefined,
-            notificationDecorationClassName: String(notificationDecoration?.className || "").trim() || undefined,
-        });
-    }, [items.length, filter]);
 
     const visibleItems = useMemo(() => {
         const norm = (v: string): string => String(v || "").trim().toLowerCase();
@@ -183,16 +136,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                             index={index}
                             count={visibleItems.length}
                             onSelect={(id) => void onSelectNode(id)}
-                            selectedClassName={classTpl.selectedClassName}
-                            unselectedClassName={classTpl.unselectedClassName}
-                            firstClassName={classTpl.firstClassName}
-                            lastClassName={classTpl.lastClassName}
-                            containerClassName={classTpl.containerClassName}
-                            contentClassName={classTpl.contentClassName}
-                            ellipsisClassName={classTpl.ellipsisClassName}
-                            roomNameClassName={classTpl.roomNameClassName}
-                            hoverMenuClassName={classTpl.hoverMenuClassName}
-                            notificationDecorationClassName={classTpl.notificationDecorationClassName}
                         />
                     ))
                 )}
