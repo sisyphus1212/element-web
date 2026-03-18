@@ -91,15 +91,9 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 onSelect(item.node_id);
             }}
         >
-            <div
-                className={classNames(useExternalTpl ? undefined : roomListItemStyles.container, containerClassName)}
-                style={{ display: "flex", alignItems: "center", minWidth: 0 }}
-            >
+            <div className={classNames(useExternalTpl ? undefined : roomListItemStyles.container, containerClassName)}>
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
-                <div
-                    className={classNames(useExternalTpl ? undefined : roomListItemStyles.content, contentClassName)}
-                    style={{ display: "flex", alignItems: "center", minWidth: 0 }}
-                >
+                <div className={classNames(useExternalTpl ? undefined : roomListItemStyles.content, contentClassName)}>
                     <div className={classNames(useExternalTpl ? undefined : roomListItemStyles.ellipsis, ellipsisClassName)}>
                         <div
                             className={classNames(useExternalTpl ? undefined : roomListItemStyles.roomName, roomNameClassName)}
