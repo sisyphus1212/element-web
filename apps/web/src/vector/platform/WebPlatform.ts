@@ -42,8 +42,14 @@ export default class WebPlatform extends BasePlatform {
     public constructor() {
         super();
 
-        // Register the service worker in the background
-        this.registerServiceWorkerPromise = this.registerServiceWorker();
+        // Default to disabling service workers in this deployment to avoid stale bundle/cache resurrection.
+        // Set `disable_service_worker: false` in config.json to re-enable SW registration.
+        const disableServiceWorker =
+            ((SdkConfig.get() as unknown as Record<string, unknown>)["disable_service_worker"] as boolean | undefined) !==
+            false;
+        this.registerServiceWorkerPromise = disableServiceWorker
+            ? this.unregisterServiceWorkersAndCaches()
+            : this.registerServiceWorker();
         this.registerServiceWorkerPromise.catch((e) => {
             console.error("Error registering/updating service worker:", e);
         });
@@ -69,6 +75,26 @@ export default class WebPlatform extends BasePlatform {
 
         navigator.serviceWorker.addEventListener("message", this.onServiceWorkerPostMessage);
         await registration.update();
+    }
+
+    private async unregisterServiceWorkersAndCaches(): Promise<void> {
+        if (!("serviceWorker" in navigator)) return;
+
+        try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+        } catch (e) {
+            logger.warn("Failed to unregister service workers", e);
+        }
+
+        if ("caches" in window) {
+            try {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+            } catch (e) {
+                logger.warn("Failed to clear cache storage", e);
+            }
+        }
     }
 
     private handleServiceWorkerRegistrationError = (): void => {
