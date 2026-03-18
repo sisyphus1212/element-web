@@ -166,12 +166,16 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                 <div className="mx_HomePage_default_wrapper">
                     <div>
                         <h1>{_t("common|people")} Node Details</h1>
-                        <h2>{selectedNodeDetail.display_name || selectedNodeDetail.node_id}</h2>
+                        <h2>{selectedNodeDetail.node_id}</h2>
+                        <div style={{ fontSize: 13, opacity: 0.8 }}>
+                            Hostname: {selectedNodeDetail.display_name || "-"}
+                        </div>
                     </div>
                     <div style={{ width: "min(920px, 100%)", textAlign: "left", border: "1px solid var(--cpd-color-border-subtle-primary)", borderRadius: 12, padding: 16 }}>
-                        <div><b>node_id:</b> {selectedNodeDetail.node_id}</div>
+                        <div><b>node_id (System ID):</b> {selectedNodeDetail.node_id}</div>
+                        <div><b>display_name (Hostname):</b> {selectedNodeDetail.display_name || "-"}</div>
                         <div><b>status:</b> {st}</div>
-                        <div><b>matrix_user_id:</b> {selectedNodeDetail.matrix_user_id || "-"}</div>
+                        <div><b>matrix_user_id (MXID):</b> {selectedNodeDetail.matrix_user_id || "-"}</div>
                         <div><b>last_seen:</b> {lastSeen > 0 ? new Date(lastSeen).toLocaleString() : "-"}</div>
                         <div><b>active_node_session_id:</b> {selectedNodeDetail.control_state?.active_node_session_id || "-"}</div>
                         <div><b>active_codex_thread_id:</b> {selectedNodeDetail.control_state?.active_codex_thread_id || "-"}</div>

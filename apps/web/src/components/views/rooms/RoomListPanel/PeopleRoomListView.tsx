@@ -58,13 +58,17 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     }, [reloadNodes]);
 
     const visibleItems = useMemo(() => {
+        const norm = (v: string): string => String(v || "").trim().toLowerCase();
         return items
             .filter((it) => matchesFilter(it, filter))
             .sort((a, b) => {
-                const ao = isOnline(a.status);
-                const bo = isOnline(b.status);
-                if (ao !== bo) return ao ? -1 : 1;
-                return a.display_name.localeCompare(b.display_name);
+                const ad = norm(a.display_name);
+                const bd = norm(b.display_name);
+                if (ad && !bd) return -1;
+                if (!ad && bd) return 1;
+                const byDisplay = ad.localeCompare(bd);
+                if (byDisplay !== 0) return byDisplay;
+                return norm(a.node_id).localeCompare(norm(b.node_id));
             });
     }, [items, filter]);
 

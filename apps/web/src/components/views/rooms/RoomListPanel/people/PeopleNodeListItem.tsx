@@ -49,6 +49,9 @@ export const PeopleNodeListItem: React.FC<Props> = ({
     hoverMenuClassName,
     notificationDecorationClassName,
 }) => {
+    const nodeId = String(item.node_id || "").trim();
+    const hostLabel = String(item.display_name || "").trim();
+    const showHostLabel = Boolean(hostLabel && hostLabel !== nodeId);
     const rowClass = classNames(
         roomListItemStyles.roomListItem,
         "mx_RoomListItemView",
@@ -68,7 +71,7 @@ export const PeopleNodeListItem: React.FC<Props> = ({
             aria-posinset={index + 1}
             aria-setsize={count}
             aria-selected={selected}
-            aria-label={`Select node ${item.display_name}`}
+            aria-label={showHostLabel ? `Select node ${nodeId} (${hostLabel})` : `Select node ${nodeId}`}
             data-people-node-id={item.node_id}
             className={rowClass}
             onMouseDown={(ev) => {
@@ -85,9 +88,14 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
                 <div className={classNames(roomListItemStyles.content, contentClassName)}>
                     <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
-                        <div className={classNames(roomListItemStyles.roomName, roomNameClassName)} title={item.display_name} data-testid="room-name">
-                            {item.display_name}
+                        <div className={classNames(roomListItemStyles.roomName, roomNameClassName)} title={nodeId} data-testid="room-name">
+                            {nodeId}
                         </div>
+                        {showHostLabel ? (
+                            <div title={hostLabel} style={{ fontSize: 12, opacity: 0.75 }}>
+                                {hostLabel}
+                            </div>
+                        ) : null}
                     </div>
                     <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
                     <div className={classNames(roomListItemStyles.notificationDecoration, notificationDecorationClassName)} aria-hidden={true}>
