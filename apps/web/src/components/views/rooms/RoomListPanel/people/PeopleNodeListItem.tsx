@@ -53,17 +53,23 @@ export const PeopleNodeListItem: React.FC<Props> = ({
     const hostLabel = String(item.display_name || "").trim();
     const showHostLabel = Boolean(hostLabel && hostLabel !== nodeId);
     const rowLabel = showHostLabel ? `${nodeId} · ${hostLabel}` : nodeId;
-    const rowClass = classNames(
-        roomListItemStyles.roomListItem,
-        "mx_RoomListItemView",
-        {
-            [roomListItemStyles.selected]: selected,
-            [roomListItemStyles.firstItem]: index === 0,
-            [roomListItemStyles.lastItem]: index === count - 1,
-            mx_RoomListItemView_selected: selected,
-        },
-        selected ? selectedClassName : unselectedClassName,
-    );
+    const useExternalTpl = Boolean(selectedClassName && unselectedClassName);
+    const rowClass = useExternalTpl
+        ? classNames(selected ? selectedClassName : unselectedClassName, {
+              [firstClassName || ""]: index === 0 && Boolean(firstClassName),
+              [lastClassName || ""]: index === count - 1 && Boolean(lastClassName),
+          })
+        : classNames(
+              roomListItemStyles.roomListItem,
+              "mx_RoomListItemView",
+              {
+                  [roomListItemStyles.selected]: selected,
+                  [roomListItemStyles.firstItem]: index === 0,
+                  [roomListItemStyles.lastItem]: index === count - 1,
+                  mx_RoomListItemView_selected: selected,
+              },
+              selected ? selectedClassName : unselectedClassName,
+          );
 
     return (
         <button
@@ -86,17 +92,17 @@ export const PeopleNodeListItem: React.FC<Props> = ({
             }}
         >
             <div
-                className={classNames(roomListItemStyles.container, containerClassName)}
+                className={classNames(useExternalTpl ? undefined : roomListItemStyles.container, containerClassName)}
                 style={{ display: "flex", alignItems: "center", minWidth: 0 }}
             >
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
                 <div
-                    className={classNames(roomListItemStyles.content, contentClassName)}
+                    className={classNames(useExternalTpl ? undefined : roomListItemStyles.content, contentClassName)}
                     style={{ display: "flex", alignItems: "center", minWidth: 0 }}
                 >
-                    <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
+                    <div className={classNames(useExternalTpl ? undefined : roomListItemStyles.ellipsis, ellipsisClassName)}>
                         <div
-                            className={classNames(roomListItemStyles.roomName, roomNameClassName)}
+                            className={classNames(useExternalTpl ? undefined : roomListItemStyles.roomName, roomNameClassName)}
                             title={showHostLabel ? `${nodeId} (${hostLabel})` : nodeId}
                             data-testid="room-name"
                             style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
@@ -104,8 +110,11 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rowLabel}</span>
                         </div>
                     </div>
-                    <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
-                    <div className={classNames(roomListItemStyles.notificationDecoration, notificationDecorationClassName)} aria-hidden={true}>
+                    <div className={classNames(useExternalTpl ? undefined : roomListItemStyles.hoverMenu, hoverMenuClassName)} />
+                    <div
+                        className={classNames(useExternalTpl ? undefined : roomListItemStyles.notificationDecoration, notificationDecorationClassName)}
+                        aria-hidden={true}
+                    >
                         {pending ? <span style={{ fontSize: 11, opacity: 0.7 }}>Loading…</span> : null}
                     </div>
                 </div>
