@@ -57,25 +57,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         void reloadNodes();
     }, [reloadNodes]);
 
-    useEffect(() => {
-        const removeLegacyNodeControls = (): void => {
-            const panels = Array.from(document.querySelectorAll("div"));
-            for (const panel of panels) {
-                const host = panel as HTMLDivElement;
-                const txt = String(host.textContent || "");
-                if (!txt.includes("Node Controls:")) continue;
-                if (!txt.includes("View Details") && !txt.includes("Hide Details")) continue;
-                if (!txt.includes("Runtime Profiles") && !txt.includes("No runtime profiles")) continue;
-                host.remove();
-            }
-        };
-
-        removeLegacyNodeControls();
-        const mo = new MutationObserver(() => removeLegacyNodeControls());
-        mo.observe(document.body, { childList: true, subtree: true });
-        return () => mo.disconnect();
-    }, []);
-
     const visibleItems = useMemo(() => {
         return items
             .filter((it) => matchesFilter(it, filter))
