@@ -52,6 +52,7 @@ export const PeopleNodeListItem: React.FC<Props> = ({
     const nodeId = String(item.node_id || "").trim();
     const hostLabel = String(item.display_name || "").trim();
     const showHostLabel = Boolean(hostLabel && hostLabel !== nodeId);
+    const rowLabel = showHostLabel ? `${nodeId} · ${hostLabel}` : nodeId;
     const rowClass = classNames(
         roomListItemStyles.roomListItem,
         "mx_RoomListItemView",
@@ -94,12 +95,7 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                             data-testid="room-name"
                             style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
                         >
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nodeId}</span>
-                            {showHostLabel ? (
-                                <span style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {hostLabel}
-                                </span>
-                            ) : null}
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rowLabel}</span>
                         </div>
                     </div>
                     <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
