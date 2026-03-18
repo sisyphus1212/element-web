@@ -5,11 +5,16 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React from "react";
-import classNames from "classnames";
+import React, { useMemo } from "react";
+import {
+    MockViewModel,
+    RoomListItemView,
+    RoomNotifState,
+    type RoomItemViewModel,
+    type RoomListItemSnapshot,
+} from "@element-hq/web-shared-components";
 
 import BaseAvatar from "../../../avatars/BaseAvatar";
-import roomListItemStyles from "../../../../../../../../packages/shared-components/src/room-list/RoomListItemView/RoomListItemView.module.css";
 import type { PeopleNodeItem } from "./types";
 
 type Props = {
@@ -19,82 +24,65 @@ type Props = {
     index: number;
     count: number;
     onSelect: (nodeId: string) => void;
-    selectedClassName?: string;
-    unselectedClassName?: string;
-    firstClassName?: string;
-    lastClassName?: string;
-    containerClassName?: string;
-    contentClassName?: string;
-    ellipsisClassName?: string;
-    roomNameClassName?: string;
-    hoverMenuClassName?: string;
-    notificationDecorationClassName?: string;
 };
 
-export const PeopleNodeListItem: React.FC<Props> = ({
-    item,
-    selected,
-    pending,
-    index,
-    count,
-    onSelect,
-    selectedClassName,
-    unselectedClassName,
-    firstClassName,
-    lastClassName,
-    containerClassName,
-    contentClassName,
-    ellipsisClassName,
-    roomNameClassName,
-    hoverMenuClassName,
-    notificationDecorationClassName,
-}) => {
-    const rowClass = classNames(
-        roomListItemStyles.roomListItem,
-        "mx_RoomListItemView",
-        {
-            [roomListItemStyles.selected]: selected,
-            [roomListItemStyles.firstItem]: index === 0,
-            [roomListItemStyles.lastItem]: index === count - 1,
-            mx_RoomListItemView_selected: selected,
+function buildSnapshot(item: PeopleNodeItem): RoomListItemSnapshot {
+    return {
+        id: item.node_id,
+        room: item,
+        name: item.display_name,
+        isBold: false,
+        notification: {
+            hasAnyNotificationOrActivity: false,
+            isUnsentMessage: false,
+            invited: false,
+            isMention: false,
+            isActivityNotification: false,
+            isNotification: false,
+            hasUnreadCount: false,
+            count: 0,
+            muted: false,
         },
-        selected ? selectedClassName : unselectedClassName,
-    );
+        showMoreOptionsMenu: false,
+        showNotificationMenu: false,
+        isFavourite: false,
+        isLowPriority: false,
+        canInvite: false,
+        canCopyRoomLink: false,
+        canMarkAsRead: false,
+        canMarkAsUnread: false,
+        roomNotifState: RoomNotifState.MentionsAndKeywordsOnly,
+        messagePreview: pending ? "Loading…" : undefined,
+    };
+}
+
+export const PeopleNodeListItem: React.FC<Props> = ({ item, selected, pending, index, count, onSelect }) => {
+    const vm = useMemo(() => {
+        const base = new MockViewModel<RoomListItemSnapshot>(buildSnapshot(item));
+        const roomVm: RoomItemViewModel = {
+            ...base,
+            onOpenRoom: () => onSelect(item.node_id),
+            onMarkAsRead: () => undefined,
+            onMarkAsUnread: () => undefined,
+            onToggleFavorite: () => undefined,
+            onToggleLowPriority: () => undefined,
+            onInvite: () => undefined,
+            onCopyRoomLink: () => undefined,
+            onLeaveRoom: () => undefined,
+            onSetRoomNotifState: () => undefined,
+        };
+        return roomVm;
+    }, [item, onSelect, pending]);
 
     return (
-        <button
-            type="button"
-            role="option"
-            aria-posinset={index + 1}
-            aria-setsize={count}
-            aria-selected={selected}
-            aria-label={`Select node ${item.display_name}`}
-            data-people-node-id={item.node_id}
-            className={rowClass}
-            onMouseDown={(ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-            }}
-            onClick={(ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                onSelect(item.node_id);
-            }}
-        >
-            <div className={classNames(roomListItemStyles.container, containerClassName)}>
-                <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
-                <div className={classNames(roomListItemStyles.content, contentClassName)}>
-                    <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
-                        <div className={classNames(roomListItemStyles.roomName, roomNameClassName)} title={item.display_name} data-testid="room-name">
-                            {item.display_name}
-                        </div>
-                    </div>
-                    <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
-                    <div className={classNames(roomListItemStyles.notificationDecoration, notificationDecorationClassName)} aria-hidden={true}>
-                        {pending ? <span style={{ fontSize: 11, opacity: 0.7 }}>Loading…</span> : null}
-                    </div>
-                </div>
-            </div>
-        </button>
+        <RoomListItemView
+            vm={vm}
+            isSelected={selected}
+            isFocused={false}
+            roomIndex={index}
+            roomCount={count}
+            onFocus={() => undefined}
+            renderAvatar={() => <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />}
+        />
     );
 };
