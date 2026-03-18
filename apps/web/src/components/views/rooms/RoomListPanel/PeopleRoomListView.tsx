@@ -10,9 +10,9 @@ import { ChatFilter, IconButton } from "@vector-im/compound-web";
 import ChevronDownIcon from "@vector-im/compound-design-tokens/assets/web/icons/chevron-down";
 
 import { _t } from "../../../../languageHandler";
-import { applyRuntimeProfile, fetchPeopleNodes, loadNodeBundle, switchCodexThread } from "./people/api";
+import { fetchPeopleNodes, loadNodeBundle } from "./people/api";
 import { PeopleNodeListItem } from "./people/PeopleNodeListItem";
-import type { NodeControlState, NodeDetailItem, PeopleFilter, PeopleNodeItem, RuntimeProfileItem } from "./people/types";
+import type { NodeDetailItem, PeopleFilter, PeopleNodeItem } from "./people/types";
 
 function isOnline(status: string): boolean {
     return String(status || "").toLowerCase() === "online";
@@ -32,11 +32,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
     const [error, setError] = useState<string>("");
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedNodeId, setSelectedNodeId] = useState<string>("");
-    const [controlState, setControlState] = useState<NodeControlState | null>(null);
-    const [threadItems, setThreadItems] = useState<Array<{ codex_thread_id: string; title: string; archived: boolean }>>([]);
-    const [runtimeProfiles, setRuntimeProfiles] = useState<RuntimeProfileItem[]>([]);
-    const [nodeDetail, setNodeDetail] = useState<NodeDetailItem | null>(null);
-    const [detailOpen, setDetailOpen] = useState<boolean>(false);
 
     const publishNodeDetailToHome = useCallback((detail: NodeDetailItem): void => {
         try {
@@ -82,10 +77,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             setError("");
             try {
                 const bundle = await loadNodeBundle(id);
-                setControlState(bundle.controlState);
-                setThreadItems(bundle.threadItems);
-                setRuntimeProfiles(bundle.runtimeProfiles);
-                setNodeDetail(bundle.nodeDetail);
                 if (bundle.nodeDetail) publishNodeDetailToHome(bundle.nodeDetail);
             } catch (e) {
                 setError(`Load node details failed: ${String((e as Error)?.message || e)}`);
@@ -145,111 +136,6 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
                     ))
                 )}
             </div>
-            {selectedNodeId && (
-                <div style={{ marginTop: 12, padding: 8, borderTop: "1px solid var(--cpd-color-border-subtle-primary)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontWeight: 600 }}>Node Controls: {selectedNodeId}</div>
-                        <button
-                            type="button"
-                            onClick={() => setDetailOpen((v) => !v)}
-                            style={{
-                                padding: "2px 6px",
-                                borderRadius: 8,
-                                border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                background: "transparent",
-                            }}
-                        >
-                            {detailOpen ? "Hide Details" : "View Details"}
-                        </button>
-                    </div>
-                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-                        session={String(controlState?.active_node_session_id || "-")} thread={String(controlState?.active_codex_thread_id || "-")}
-                    </div>
-                    {detailOpen && (
-                        <div
-                            style={{
-                                marginBottom: 10,
-                                padding: 8,
-                                borderRadius: 8,
-                                border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                background: "var(--cpd-color-bg-subtle-secondary)",
-                                fontSize: 12,
-                                lineHeight: 1.45,
-                            }}
-                        >
-                            <div>node_id: {String(nodeDetail?.node_id || selectedNodeId)}</div>
-                            <div>display_name: {String(nodeDetail?.display_name || "-")}</div>
-                            <div>status: {String(nodeDetail?.status || "-")}</div>
-                            <div>last_seen: {nodeDetail?.last_seen ? new Date(nodeDetail.last_seen).toLocaleString() : "-"}</div>
-                            <div>matrix_user_id: {String(nodeDetail?.matrix_user_id || "-")}</div>
-                            <div>threads: {Number(nodeDetail?.threads_total || 0)} (archived {Number(nodeDetail?.threads_archived || 0)})</div>
-                            <div>
-                                runtime_profiles: {Number(nodeDetail?.runtime_profiles_total || 0)} (default {Number(nodeDetail?.runtime_profiles_default || 0)})
-                            </div>
-                        </div>
-                    )}
-                    <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Threads</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {threadItems.length === 0 ? <span style={{ opacity: 0.7 }}>No threads</span> : threadItems.map((t) => (
-                                <button
-                                    key={t.codex_thread_id}
-                                    type="button"
-                                    disabled={t.archived}
-                                    onClick={async () => {
-                                        try {
-                                            const nsid = String(controlState?.active_node_session_id || "").trim();
-                                            if (!nsid) throw new Error("missing_active_node_session_id");
-                                            await switchCodexThread(nsid, t.codex_thread_id);
-                                            setControlState((prev) => ({ ...(prev || ({} as NodeControlState)), active_codex_thread_id: t.codex_thread_id }));
-                                        } catch (e) {
-                                            setError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
-                                        }
-                                    }}
-                                    style={{
-                                        padding: "2px 6px",
-                                        borderRadius: 8,
-                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                        background:
-                                            String(controlState?.active_codex_thread_id || "") === t.codex_thread_id
-                                                ? "var(--cpd-color-bg-canvas-default)"
-                                                : "transparent",
-                                    }}
-                                >
-                                    {t.title || t.codex_thread_id.slice(0, 8)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Runtime Profiles</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {runtimeProfiles.length === 0 ? <span style={{ opacity: 0.7 }}>No runtime profiles</span> : runtimeProfiles.map((rp) => (
-                                <button
-                                    key={rp.runtime_profile_id}
-                                    type="button"
-                                    onClick={async () => {
-                                        try {
-                                            await applyRuntimeProfile(selectedNodeId, rp.runtime_profile_id);
-                                            setRuntimeProfiles((prev) => prev.map((x) => ({ ...x, is_default: x.runtime_profile_id === rp.runtime_profile_id })));
-                                        } catch (e) {
-                                            setError(`Apply runtime profile failed: ${String((e as Error)?.message || e)}`);
-                                        }
-                                    }}
-                                    style={{
-                                        padding: "2px 6px",
-                                        borderRadius: 8,
-                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                        background: rp.is_default ? "var(--cpd-color-bg-canvas-default)" : "transparent",
-                                    }}
-                                >
-                                    {rp.runtime_profile_id.slice(0, 8)} v{rp.version}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 };
