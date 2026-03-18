@@ -6,8 +6,10 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React from "react";
+import classNames from "classnames";
 
 import BaseAvatar from "../../../avatars/BaseAvatar";
+import roomListItemStyles from "../../../../../../../../packages/shared-components/src/room-list/RoomListItemView/RoomListItemView.module.css";
 import type { PeopleNodeItem } from "./types";
 
 type Props = {
@@ -17,8 +19,8 @@ type Props = {
     index: number;
     count: number;
     onSelect: (nodeId: string) => void;
-    selectedClassName: string;
-    unselectedClassName: string;
+    selectedClassName?: string;
+    unselectedClassName?: string;
     firstClassName?: string;
     lastClassName?: string;
     containerClassName?: string;
@@ -28,10 +30,6 @@ type Props = {
     hoverMenuClassName?: string;
     notificationDecorationClassName?: string;
 };
-
-function isOnline(status: string): boolean {
-    return String(status || "").toLowerCase() === "online";
-}
 
 export const PeopleNodeListItem: React.FC<Props> = ({
     item,
@@ -51,10 +49,17 @@ export const PeopleNodeListItem: React.FC<Props> = ({
     hoverMenuClassName,
     notificationDecorationClassName,
 }) => {
-    const edgeClass =
-        `${index === 0 && firstClassName ? ` ${firstClassName}` : ""}` +
-        `${index === count - 1 && lastClassName ? ` ${lastClassName}` : ""}`;
-    const rowClass = `${selected ? selectedClassName : unselectedClassName}${edgeClass}`;
+    const rowClass = classNames(
+        roomListItemStyles.roomListItem,
+        "mx_RoomListItemView",
+        {
+            [roomListItemStyles.selected]: selected,
+            [roomListItemStyles.firstItem]: index === 0,
+            [roomListItemStyles.lastItem]: index === count - 1,
+            mx_RoomListItemView_selected: selected,
+        },
+        selected ? selectedClassName : unselectedClassName,
+    );
 
     return (
         <button
@@ -76,16 +81,16 @@ export const PeopleNodeListItem: React.FC<Props> = ({
                 onSelect(item.node_id);
             }}
         >
-            <div className={containerClassName || ""}>
+            <div className={classNames(roomListItemStyles.container, containerClassName)}>
                 <BaseAvatar name={item.display_name} idName={item.node_id} size="32px" />
-                <div className={contentClassName || ""}>
-                    <div className={ellipsisClassName || ""}>
-                        <div className={roomNameClassName || ""} title={item.display_name} data-testid="room-name">
+                <div className={classNames(roomListItemStyles.content, contentClassName)}>
+                    <div className={classNames(roomListItemStyles.ellipsis, ellipsisClassName)}>
+                        <div className={classNames(roomListItemStyles.roomName, roomNameClassName)} title={item.display_name} data-testid="room-name">
                             {item.display_name}
                         </div>
                     </div>
-                    <div className={hoverMenuClassName || ""} />
-                    <div className={notificationDecorationClassName || ""} aria-hidden={true}>
+                    <div className={classNames(roomListItemStyles.hoverMenu, hoverMenuClassName)} />
+                    <div className={classNames(roomListItemStyles.notificationDecoration, notificationDecorationClassName)} aria-hidden={true}>
                         {pending ? <span style={{ fontSize: 11, opacity: 0.7 }}>Loading…</span> : null}
                     </div>
                 </div>
