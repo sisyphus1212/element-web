@@ -284,12 +284,13 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                                     return (
                                                         <AccessibleButton
                                                             key={tid}
+                                                            element="button"
                                                             role="option"
                                                             aria-selected={selected}
                                                             disabled={archived || threadDialogBusy}
                                                             onClick={() => setSelectedThreadId(tid)}
                                                             style={{
-                                                                padding: 10,
+                                                                padding: "10px 12px",
                                                                 borderRadius: 8,
                                                                 border: selected
                                                                     ? "1px solid var(--cpd-color-border-interactive-accent)"
@@ -298,6 +299,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                                                     ? "var(--cpd-color-bg-subtle-secondary)"
                                                                     : "var(--cpd-color-bg-canvas-default)",
                                                                 textAlign: "left",
+                                                                width: "100%",
                                                             }}
                                                         >
                                                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -319,11 +321,16 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                         ) : null}
                                     </div>
                                     <div className="mx_Dialog_buttons">
-                                        <AccessibleButton onClick={() => setShowCreateDialog(true)}>{_t("action|create")}</AccessibleButton>
-                                        <AccessibleButton onClick={() => setShowThreadDialog(false)}>{_t("action|cancel")}</AccessibleButton>
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(true)}>
+                                            {_t("action|create")}
+                                        </AccessibleButton>
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowThreadDialog(false)}>
+                                            {_t("action|cancel")}
+                                        </AccessibleButton>
                                         <AccessibleButton
+                                            element="button"
+                                            kind="primary"
                                             onClick={() => void onApplyThreadSwitch()}
-                                            className="mx_HomePage_button_explore"
                                             disabled={threadDialogBusy || !selectedThreadId || selectedThreadId === activeThreadId}
                                         >
                                             {threadDialogBusy ? _t("common|loading") : _t("action|apply")}
@@ -356,8 +363,15 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                         />
                                     </div>
                                     <div className="mx_Dialog_buttons">
-                                        <AccessibleButton onClick={() => setShowCreateDialog(false)}>{_t("action|cancel")}</AccessibleButton>
-                                        <AccessibleButton onClick={() => void onCreateThread()} className="mx_HomePage_button_explore" disabled={threadDialogBusy || !String(newThreadTitle || "").trim()}>
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(false)}>
+                                            {_t("action|cancel")}
+                                        </AccessibleButton>
+                                        <AccessibleButton
+                                            element="button"
+                                            kind="primary"
+                                            onClick={() => void onCreateThread()}
+                                            disabled={threadDialogBusy || !String(newThreadTitle || "").trim()}
+                                        >
                                             {threadDialogBusy ? _t("common|loading") : _t("action|create")}
                                         </AccessibleButton>
                                     </div>
