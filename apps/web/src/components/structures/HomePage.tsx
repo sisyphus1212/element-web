@@ -25,6 +25,10 @@ import MatrixClientContext, { useMatrixClientContext } from "../../contexts/Matr
 import MiniAvatarUploader, { AVATAR_SIZE } from "../views/elements/MiniAvatarUploader";
 import PosthogTrackers from "../../PosthogTrackers";
 import EmbeddedPage from "./EmbeddedPage";
+import Modal from "../../Modal";
+import TextInputDialog from "../views/dialogs/TextInputDialog";
+import NodeThreadManagerDialog from "../views/dialogs/NodeThreadManagerDialog";
+import { createCodexThread, loadNodeBundle, switchCodexThread } from "../views/rooms/RoomListPanel/people/api";
 
 const onClickSendDm = (ev: ButtonEvent): void => {
     PosthogTrackers.trackInteraction("WebHomeCreateChatButton", ev);
@@ -125,6 +129,11 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const config = SdkConfig.get();
     const pageUrl = getHomePageUrl(config, cli);
     const [selectedNodeDetail, setSelectedNodeDetail] = useState<PeopleSelectedNodeDetail | null>(loadSelectedNodeDetail());
+    const [threadItems, setThreadItems] = useState<Array<{ codex_thread_id: string; title: string; archived: boolean }>>([]);
+    const [activeThreadId, setActiveThreadId] = useState<string>("");
+    const [selectedThreadId, setSelectedThreadId] = useState<string>("");
+    const [threadDialogBusy, setThreadDialogBusy] = useState<boolean>(false);
+    const [threadDialogError, setThreadDialogError] = useState<string>("");
 
     const clearSelectedNodeDetail = useCallback((): void => {
         try {
@@ -153,6 +162,96 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
             window.removeEventListener("storage", onStorage);
         };
     }, []);
+
+    const refreshSelectedNodeBundle = useCallback(async (): Promise<void> => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        if (!nodeId) return;
+        const bundle = await loadNodeBundle(nodeId);
+        const nextActiveTid = String(bundle.controlState?.active_codex_thread_id || "");
+        setThreadItems(Array.isArray(bundle.threadItems) ? bundle.threadItems : []);
+        setActiveThreadId(nextActiveTid);
+        setSelectedThreadId(nextActiveTid);
+        if (bundle.nodeDetail) {
+            try {
+                window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify(bundle.nodeDetail || {}));
+            } catch {}
+            setSelectedNodeDetail(bundle.nodeDetail);
+        }
+    }, [selectedNodeDetail?.node_id]);
+
+    useEffect(() => {
+        void refreshSelectedNodeBundle();
+    }, [refreshSelectedNodeBundle]);
+
+    const onOpenCreateThreadDialog = useCallback(async (): Promise<void> => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        if (!nodeId) return;
+        const { finished } = Modal.createDialog(TextInputDialog, {
+            title: "Create Codex Thread",
+            description: "Thread title",
+            placeholder: "e.g. debug-session",
+            button: "Create",
+            value: "",
+            hasCancel: true,
+            fixedWidth: true,
+        });
+        const [ok, text] = await finished;
+        if (!ok) return;
+        const title = String(text || "").trim();
+        if (!title) return;
+        setThreadDialogBusy(true);
+        setThreadDialogError("");
+        try {
+            await createCodexThread(nodeId, title, false);
+            await refreshSelectedNodeBundle();
+        } catch (e) {
+            setThreadDialogError(`Create thread failed: ${String((e as Error)?.message || e)}`);
+        } finally {
+            setThreadDialogBusy(false);
+        }
+    }, [refreshSelectedNodeBundle, selectedNodeDetail?.node_id]);
+
+    const onOpenThreadManagerDialog = useCallback((): void => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        const nodeSessionId = String(selectedNodeDetail?.control_state?.active_node_session_id || "").trim();
+        if (!nodeId || !nodeSessionId) return;
+        setThreadDialogError("");
+        const dialog = Modal.createDialog(NodeThreadManagerDialog, {
+            nodeId,
+            items: threadItems,
+            activeThreadId,
+            selectedThreadId,
+            busy: threadDialogBusy,
+            error: threadDialogError,
+            onSelectThread: (tid: string) => setSelectedThreadId(String(tid || "")),
+            onCreateThread: () => void onOpenCreateThreadDialog(),
+            onApplySwitch: async () => {
+                const nextTid = String(selectedThreadId || "").trim();
+                if (!nextTid || nextTid === activeThreadId) return;
+                setThreadDialogBusy(true);
+                setThreadDialogError("");
+                try {
+                    await switchCodexThread(nodeSessionId, nextTid);
+                    await refreshSelectedNodeBundle();
+                    dialog.close();
+                } catch (e) {
+                    setThreadDialogError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
+                } finally {
+                    setThreadDialogBusy(false);
+                }
+            },
+        });
+    }, [
+        activeThreadId,
+        onOpenCreateThreadDialog,
+        refreshSelectedNodeBundle,
+        selectedNodeDetail?.control_state?.active_node_session_id,
+        selectedNodeDetail?.node_id,
+        selectedThreadId,
+        threadDialogBusy,
+        threadDialogError,
+        threadItems,
+    ]);
 
     if (pageUrl) {
         return <EmbeddedPage className="mx_HomePage" url={pageUrl} scrollbar={true} />;
@@ -184,6 +283,11 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                         <div><b>matrix_thread_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_thread_id || "-"}</div>
                         <div><b>threads:</b> {Number(selectedNodeDetail.threads_total || 0)} (archived {Number(selectedNodeDetail.threads_archived || 0)})</div>
                         <div><b>runtime_profiles:</b> {Number(selectedNodeDetail.runtime_profiles_total || 0)} (default {Number(selectedNodeDetail.runtime_profiles_default || 0)})</div>
+                        <div style={{ marginTop: 12 }}>
+                            <AccessibleButton onClick={onOpenThreadManagerDialog} className="mx_HomePage_button_explore">
+                                Manage Codex Threads
+                            </AccessibleButton>
+                        </div>
                     </div>
                     <div className="mx_HomePage_default_buttons">
                         <AccessibleButton onClick={clearSelectedNodeDetail} className="mx_HomePage_button_explore">

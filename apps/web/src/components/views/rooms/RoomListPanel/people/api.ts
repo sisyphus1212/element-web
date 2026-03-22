@@ -1,3 +1,10 @@
+/*
+Copyright 2026 New Vector Ltd.
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
 import type { NodeBundle, NodeControlState, NodeDetailItem, PeopleNodeItem, RuntimeProfileItem } from "./types";
 
 function readToken(): string {
@@ -134,6 +141,18 @@ export async function switchCodexThread(nodeSessionId: string, codexThreadId: st
     });
     const body = await rep.json().catch(() => ({} as any));
     if (!body?.ok) throw new Error(String(body?.error || "switch_thread_failed"));
+}
+
+export async function createCodexThread(nodeId: string, title: string, setActive = true): Promise<void> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/conversation-config/create-thread`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ title, set_active: setActive }),
+    });
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok) throw new Error(String(body?.error || "create_thread_failed"));
 }
 
 export async function applyRuntimeProfile(nodeId: string, runtimeProfileId: string): Promise<void> {
