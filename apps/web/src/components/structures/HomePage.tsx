@@ -25,7 +25,13 @@ import MatrixClientContext, { useMatrixClientContext } from "../../contexts/Matr
 import MiniAvatarUploader, { AVATAR_SIZE } from "../views/elements/MiniAvatarUploader";
 import PosthogTrackers from "../../PosthogTrackers";
 import EmbeddedPage from "./EmbeddedPage";
-import { createCodexThread, loadNodeBundle, switchCodexThread } from "../views/rooms/RoomListPanel/people/api";
+import {
+    activateCodexThread,
+    createCodexThread,
+    deleteCodexThread,
+    loadNodeBundle,
+    updateCodexThread,
+} from "../views/rooms/RoomListPanel/people/api";
 
 const onClickSendDm = (ev: ButtonEvent): void => {
     PosthogTrackers.trackInteraction("WebHomeCreateChatButton", ev);
@@ -191,7 +197,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         setThreadDialogBusy(true);
         setThreadDialogError("");
         try {
-            await createCodexThread(nodeId, title, false);
+            await createCodexThread(nodeId, { title, set_active: false });
             await refreshSelectedNodeBundle();
             setShowCreateDialog(false);
             setNewThreadTitle("");
@@ -203,13 +209,13 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     }, [newThreadTitle, refreshSelectedNodeBundle, selectedNodeDetail?.node_id]);
 
     const onApplyThreadSwitch = useCallback(async (): Promise<void> => {
-        const nodeSessionId = String(selectedNodeDetail?.control_state?.active_node_session_id || "").trim();
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
         const nextTid = String(selectedThreadId || "").trim();
-        if (!nodeSessionId || !nextTid || nextTid === activeThreadId) return;
+        if (!nodeId || !nextTid || nextTid === activeThreadId) return;
         setThreadDialogBusy(true);
         setThreadDialogError("");
         try {
-            await switchCodexThread(nodeSessionId, nextTid);
+            await activateCodexThread(nodeId, nextTid);
             await refreshSelectedNodeBundle();
             setShowThreadDialog(false);
         } catch (e) {
@@ -217,7 +223,62 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         } finally {
             setThreadDialogBusy(false);
         }
-    }, [activeThreadId, refreshSelectedNodeBundle, selectedNodeDetail?.control_state?.active_node_session_id, selectedThreadId]);
+    }, [activeThreadId, refreshSelectedNodeBundle, selectedNodeDetail?.node_id, selectedThreadId]);
+
+    const onRenameThread = useCallback(async (): Promise<void> => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        const tid = String(selectedThreadId || "").trim();
+        if (!nodeId || !tid) return;
+        const current = threadItems.find((it) => String(it.codex_thread_id || "") === tid);
+        const nextTitle = window.prompt("Thread title", String(current?.title || tid));
+        if (nextTitle === null) return;
+        setThreadDialogBusy(true);
+        setThreadDialogError("");
+        try {
+            await updateCodexThread(nodeId, tid, { title: String(nextTitle || "").trim() });
+            await refreshSelectedNodeBundle();
+        } catch (e) {
+            setThreadDialogError(`Rename thread failed: ${String((e as Error)?.message || e)}`);
+        } finally {
+            setThreadDialogBusy(false);
+        }
+    }, [refreshSelectedNodeBundle, selectedNodeDetail?.node_id, selectedThreadId, threadItems]);
+
+    const onToggleArchiveThread = useCallback(async (): Promise<void> => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        const tid = String(selectedThreadId || "").trim();
+        if (!nodeId || !tid) return;
+        const cur = threadItems.find((it) => String(it.codex_thread_id || "") === tid);
+        const nextArchived = !Boolean(cur?.archived);
+        setThreadDialogBusy(true);
+        setThreadDialogError("");
+        try {
+            await updateCodexThread(nodeId, tid, { archived: nextArchived });
+            await refreshSelectedNodeBundle();
+        } catch (e) {
+            setThreadDialogError(`${nextArchived ? "Archive" : "Unarchive"} thread failed: ${String((e as Error)?.message || e)}`);
+        } finally {
+            setThreadDialogBusy(false);
+        }
+    }, [refreshSelectedNodeBundle, selectedNodeDetail?.node_id, selectedThreadId, threadItems]);
+
+    const onDeleteThread = useCallback(async (): Promise<void> => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        const tid = String(selectedThreadId || "").trim();
+        if (!nodeId || !tid) return;
+        if (!window.confirm(`Delete thread ${tid}?`)) return;
+        setThreadDialogBusy(true);
+        setThreadDialogError("");
+        try {
+            await deleteCodexThread(nodeId, tid);
+            await refreshSelectedNodeBundle();
+            setSelectedThreadId("");
+        } catch (e) {
+            setThreadDialogError(`Delete thread failed: ${String((e as Error)?.message || e)}`);
+        } finally {
+            setThreadDialogBusy(false);
+        }
+    }, [refreshSelectedNodeBundle, selectedNodeDetail?.node_id, selectedThreadId]);
 
     if (pageUrl) {
         return <EmbeddedPage className="mx_HomePage" url={pageUrl} scrollbar={true} />;
@@ -321,6 +382,32 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                         ) : null}
                                     </div>
                                     <div className="mx_Dialog_buttons">
+                                        <AccessibleButton
+                                            element="button"
+                                            kind="secondary"
+                                            onClick={() => void onRenameThread()}
+                                            disabled={threadDialogBusy || !selectedThreadId}
+                                        >
+                                            Rename
+                                        </AccessibleButton>
+                                        <AccessibleButton
+                                            element="button"
+                                            kind="secondary"
+                                            onClick={() => void onToggleArchiveThread()}
+                                            disabled={threadDialogBusy || !selectedThreadId}
+                                        >
+                                            {threadItems.find((it) => String(it.codex_thread_id || "") === selectedThreadId)?.archived
+                                                ? "Unarchive"
+                                                : "Archive"}
+                                        </AccessibleButton>
+                                        <AccessibleButton
+                                            element="button"
+                                            kind="secondary"
+                                            onClick={() => void onDeleteThread()}
+                                            disabled={threadDialogBusy || !selectedThreadId}
+                                        >
+                                            Delete
+                                        </AccessibleButton>
                                         <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(true)}>
                                             {_t("action|create")}
                                         </AccessibleButton>

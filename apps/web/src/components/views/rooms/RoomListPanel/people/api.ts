@@ -143,16 +143,72 @@ export async function switchCodexThread(nodeSessionId: string, codexThreadId: st
     if (!body?.ok) throw new Error(String(body?.error || "switch_thread_failed"));
 }
 
-export async function createCodexThread(nodeId: string, title: string, setActive = true): Promise<void> {
+export interface ThreadCreateParams {
+    title?: string;
+    set_active?: boolean;
+    cwd?: string;
+    model?: string;
+    sandbox?: string;
+    approval_policy?: string;
+    personality?: string;
+}
+
+export async function activateCodexThread(nodeId: string, codexThreadId: string): Promise<void> {
     const token = await ensureManagerToken();
-    const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/conversation-config/create-thread`, {
+    const rep = await fetch(
+        `/api/nodes/${encodeURIComponent(nodeId)}/codex-threads/${encodeURIComponent(codexThreadId)}/activate`,
+        {
+            method: "POST",
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+            body: JSON.stringify({}),
+        },
+    );
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok) throw new Error(String(body?.error || "activate_thread_failed"));
+}
+
+export async function createCodexThread(nodeId: string, params: ThreadCreateParams): Promise<void> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/codex-threads`, {
         method: "POST",
         cache: "no-store",
         headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ title, set_active: setActive }),
+        body: JSON.stringify(params || {}),
     });
     const body = await rep.json().catch(() => ({} as any));
     if (!body?.ok) throw new Error(String(body?.error || "create_thread_failed"));
+}
+
+export async function updateCodexThread(
+    nodeId: string,
+    codexThreadId: string,
+    patch: { title?: string; archived?: boolean },
+): Promise<void> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/codex-threads/${encodeURIComponent(codexThreadId)}`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(patch || {}),
+    });
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok) throw new Error(String(body?.error || "update_thread_failed"));
+}
+
+export async function deleteCodexThread(nodeId: string, codexThreadId: string): Promise<void> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(
+        `/api/nodes/${encodeURIComponent(nodeId)}/codex-threads/${encodeURIComponent(codexThreadId)}/delete`,
+        {
+            method: "POST",
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+            body: JSON.stringify({}),
+        },
+    );
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok) throw new Error(String(body?.error || "delete_thread_failed"));
 }
 
 export async function applyRuntimeProfile(nodeId: string, runtimeProfileId: string): Promise<void> {
