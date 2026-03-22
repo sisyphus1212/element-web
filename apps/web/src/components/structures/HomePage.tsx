@@ -25,9 +25,6 @@ import MatrixClientContext, { useMatrixClientContext } from "../../contexts/Matr
 import MiniAvatarUploader, { AVATAR_SIZE } from "../views/elements/MiniAvatarUploader";
 import PosthogTrackers from "../../PosthogTrackers";
 import EmbeddedPage from "./EmbeddedPage";
-import Modal from "../../Modal";
-import TextInputDialog from "../views/dialogs/TextInputDialog";
-import NodeThreadManagerDialog from "../views/dialogs/NodeThreadManagerDialog";
 import { createCodexThread, loadNodeBundle, switchCodexThread } from "../views/rooms/RoomListPanel/people/api";
 
 const onClickSendDm = (ev: ButtonEvent): void => {
@@ -134,6 +131,9 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [selectedThreadId, setSelectedThreadId] = useState<string>("");
     const [threadDialogBusy, setThreadDialogBusy] = useState<boolean>(false);
     const [threadDialogError, setThreadDialogError] = useState<string>("");
+    const [showThreadDialog, setShowThreadDialog] = useState<boolean>(false);
+    const [showCreateDialog, setShowCreateDialog] = useState<boolean>(false);
+    const [newThreadTitle, setNewThreadTitle] = useState<string>("");
 
     const clearSelectedNodeDetail = useCallback((): void => {
         try {
@@ -183,75 +183,41 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         void refreshSelectedNodeBundle();
     }, [refreshSelectedNodeBundle]);
 
-    const onOpenCreateThreadDialog = useCallback(async (): Promise<void> => {
+    const onCreateThread = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
         if (!nodeId) return;
-        const { finished } = Modal.createDialog(TextInputDialog, {
-            title: "Create Codex Thread",
-            description: "Thread title",
-            placeholder: "e.g. debug-session",
-            button: "Create",
-            value: "",
-            hasCancel: true,
-            fixedWidth: true,
-        });
-        const [ok, text] = await finished;
-        if (!ok) return;
-        const title = String(text || "").trim();
+        const title = String(newThreadTitle || "").trim();
         if (!title) return;
         setThreadDialogBusy(true);
         setThreadDialogError("");
         try {
             await createCodexThread(nodeId, title, false);
             await refreshSelectedNodeBundle();
+            setShowCreateDialog(false);
+            setNewThreadTitle("");
         } catch (e) {
             setThreadDialogError(`Create thread failed: ${String((e as Error)?.message || e)}`);
         } finally {
             setThreadDialogBusy(false);
         }
-    }, [refreshSelectedNodeBundle, selectedNodeDetail?.node_id]);
+    }, [newThreadTitle, refreshSelectedNodeBundle, selectedNodeDetail?.node_id]);
 
-    const onOpenThreadManagerDialog = useCallback((): void => {
-        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+    const onApplyThreadSwitch = useCallback(async (): Promise<void> => {
         const nodeSessionId = String(selectedNodeDetail?.control_state?.active_node_session_id || "").trim();
-        if (!nodeId || !nodeSessionId) return;
+        const nextTid = String(selectedThreadId || "").trim();
+        if (!nodeSessionId || !nextTid || nextTid === activeThreadId) return;
+        setThreadDialogBusy(true);
         setThreadDialogError("");
-        const dialog = Modal.createDialog(NodeThreadManagerDialog, {
-            nodeId,
-            items: threadItems,
-            activeThreadId,
-            selectedThreadId,
-            busy: threadDialogBusy,
-            error: threadDialogError,
-            onSelectThread: (tid: string) => setSelectedThreadId(String(tid || "")),
-            onCreateThread: () => void onOpenCreateThreadDialog(),
-            onApplySwitch: async () => {
-                const nextTid = String(selectedThreadId || "").trim();
-                if (!nextTid || nextTid === activeThreadId) return;
-                setThreadDialogBusy(true);
-                setThreadDialogError("");
-                try {
-                    await switchCodexThread(nodeSessionId, nextTid);
-                    await refreshSelectedNodeBundle();
-                    dialog.close();
-                } catch (e) {
-                    setThreadDialogError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
-                } finally {
-                    setThreadDialogBusy(false);
-                }
-            },
-        });
-    }, [
-        activeThreadId,
-        onOpenCreateThreadDialog,
-        refreshSelectedNodeBundle,
-        selectedNodeDetail?.control_state?.active_node_session_id,
-        selectedNodeDetail?.node_id,
-        selectedThreadId,
-        threadDialogBusy,
-        threadDialogError,
-        threadItems,
-    ]);
+        try {
+            await switchCodexThread(nodeSessionId, nextTid);
+            await refreshSelectedNodeBundle();
+            setShowThreadDialog(false);
+        } catch (e) {
+            setThreadDialogError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
+        } finally {
+            setThreadDialogBusy(false);
+        }
+    }, [activeThreadId, refreshSelectedNodeBundle, selectedNodeDetail?.control_state?.active_node_session_id, selectedThreadId]);
 
     if (pageUrl) {
         return <EmbeddedPage className="mx_HomePage" url={pageUrl} scrollbar={true} />;
@@ -284,11 +250,120 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                         <div><b>threads:</b> {Number(selectedNodeDetail.threads_total || 0)} (archived {Number(selectedNodeDetail.threads_archived || 0)})</div>
                         <div><b>runtime_profiles:</b> {Number(selectedNodeDetail.runtime_profiles_total || 0)} (default {Number(selectedNodeDetail.runtime_profiles_default || 0)})</div>
                         <div style={{ marginTop: 12 }}>
-                            <AccessibleButton onClick={onOpenThreadManagerDialog} className="mx_HomePage_button_explore">
+                            <AccessibleButton
+                                onClick={() => {
+                                    setThreadDialogError("");
+                                    setShowThreadDialog(true);
+                                }}
+                                className="mx_HomePage_button_explore"
+                            >
                                 Manage Codex Threads
                             </AccessibleButton>
                         </div>
                     </div>
+                    {showThreadDialog ? (
+                        <div className="mx_Dialog_wrapper">
+                            <div className="mx_Dialog_background" onClick={() => setShowThreadDialog(false)} />
+                            <div className="mx_Dialog_border">
+                                <div className="mx_Dialog mx_Dialog_fixedWidth">
+                                    <div className="mx_Dialog_header">
+                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Manage Codex Threads - {selectedNodeDetail.node_id}</h1>
+                                    </div>
+                                    <div className="mx_Dialog_content" style={{ maxHeight: 420, overflowY: "auto" }}>
+                                        {threadItems.length === 0 ? (
+                                            <div className="mx_InlineNotice">{_t("common|no_results")}</div>
+                                        ) : (
+                                            <div role="listbox" aria-label="Codex thread list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                                {threadItems.map((it) => {
+                                                    const tid = String(it.codex_thread_id || "");
+                                                    const selected = Boolean(tid && tid === selectedThreadId);
+                                                    const active = Boolean(tid && tid === activeThreadId);
+                                                    const archived = Boolean(it.archived);
+                                                    const title = String(it.title || "").trim() || tid;
+                                                    return (
+                                                        <AccessibleButton
+                                                            key={tid}
+                                                            role="option"
+                                                            aria-selected={selected}
+                                                            disabled={archived || threadDialogBusy}
+                                                            onClick={() => setSelectedThreadId(tid)}
+                                                            style={{
+                                                                padding: 10,
+                                                                borderRadius: 8,
+                                                                border: selected
+                                                                    ? "1px solid var(--cpd-color-border-interactive-accent)"
+                                                                    : "1px solid var(--cpd-color-border-subtle-primary)",
+                                                                background: selected
+                                                                    ? "var(--cpd-color-bg-subtle-secondary)"
+                                                                    : "var(--cpd-color-bg-canvas-default)",
+                                                                textAlign: "left",
+                                                            }}
+                                                        >
+                                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                                <span style={{ fontWeight: 600 }}>{title}</span>
+                                                                <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                                                    {active ? "active" : archived ? "archived" : ""}
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ fontSize: 12, opacity: 0.78 }}>{tid}</div>
+                                                        </AccessibleButton>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {threadDialogError ? (
+                                            <div className="mx_InlineError" style={{ marginTop: 12 }}>
+                                                {threadDialogError}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <div className="mx_Dialog_buttons">
+                                        <AccessibleButton onClick={() => setShowCreateDialog(true)}>{_t("action|create")}</AccessibleButton>
+                                        <AccessibleButton onClick={() => setShowThreadDialog(false)}>{_t("action|cancel")}</AccessibleButton>
+                                        <AccessibleButton
+                                            onClick={() => void onApplyThreadSwitch()}
+                                            className="mx_HomePage_button_explore"
+                                            disabled={threadDialogBusy || !selectedThreadId || selectedThreadId === activeThreadId}
+                                        >
+                                            {threadDialogBusy ? _t("common|loading") : _t("action|apply")}
+                                        </AccessibleButton>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {showCreateDialog ? (
+                        <div className="mx_Dialog_wrapper">
+                            <div className="mx_Dialog_background" onClick={() => setShowCreateDialog(false)} />
+                            <div className="mx_Dialog_border">
+                                <div className="mx_Dialog mx_Dialog_fixedWidth">
+                                    <div className="mx_Dialog_header">
+                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Create Codex Thread</h1>
+                                    </div>
+                                    <div className="mx_Dialog_content">
+                                        <input
+                                            value={newThreadTitle}
+                                            onChange={(e) => setNewThreadTitle(e.target.value)}
+                                            placeholder="e.g. debug-session"
+                                            style={{
+                                                width: "100%",
+                                                boxSizing: "border-box",
+                                                padding: 10,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="mx_Dialog_buttons">
+                                        <AccessibleButton onClick={() => setShowCreateDialog(false)}>{_t("action|cancel")}</AccessibleButton>
+                                        <AccessibleButton onClick={() => void onCreateThread()} className="mx_HomePage_button_explore" disabled={threadDialogBusy || !String(newThreadTitle || "").trim()}>
+                                            {threadDialogBusy ? _t("common|loading") : _t("action|create")}
+                                        </AccessibleButton>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
                     <div className="mx_HomePage_default_buttons">
                         <AccessibleButton onClick={clearSelectedNodeDetail} className="mx_HomePage_button_explore">
                             {_t("action|close")}
