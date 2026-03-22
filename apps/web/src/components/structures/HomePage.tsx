@@ -249,13 +249,14 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                         <div><b>matrix_thread_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_thread_id || "-"}</div>
                         <div><b>threads:</b> {Number(selectedNodeDetail.threads_total || 0)} (archived {Number(selectedNodeDetail.threads_archived || 0)})</div>
                         <div><b>runtime_profiles:</b> {Number(selectedNodeDetail.runtime_profiles_total || 0)} (default {Number(selectedNodeDetail.runtime_profiles_default || 0)})</div>
-                        <div style={{ marginTop: 12 }}>
+                        <div className="mx_Dialog_buttons" style={{ marginTop: 12 }}>
                             <AccessibleButton
+                                element="button"
+                                kind="primary"
                                 onClick={() => {
                                     setThreadDialogError("");
                                     setShowThreadDialog(true);
                                 }}
-                                className="mx_HomePage_button_explore"
                             >
                                 Manage Codex Threads
                             </AccessibleButton>
@@ -364,8 +365,8 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                             </div>
                         </div>
                     ) : null}
-                    <div className="mx_HomePage_default_buttons">
-                        <AccessibleButton onClick={clearSelectedNodeDetail} className="mx_HomePage_button_explore">
+                    <div className="mx_Dialog_buttons">
+                        <AccessibleButton element="button" kind="secondary" onClick={clearSelectedNodeDetail}>
                             {_t("action|close")}
                         </AccessibleButton>
                     </div>
