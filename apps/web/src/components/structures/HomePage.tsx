@@ -339,8 +339,21 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         const st = String(selectedNodeDetail.status || "").toLowerCase() === "online" ? "online" : "offline";
         const lastSeen = Number(selectedNodeDetail.last_seen || 0);
         return (
-            <AutoHideScrollbar className="mx_HomePage mx_HomePage_default" element="main">
-                <div className="mx_HomePage_default_wrapper">
+            <AutoHideScrollbar
+                className="mx_HomePage mx_HomePage_default"
+                element="main"
+                style={{ maxWidth: "none", width: "100%" }}
+            >
+                <div
+                    className="mx_HomePage_default_wrapper"
+                    style={{
+                        width: "100%",
+                        maxWidth: "none",
+                        margin: 0,
+                        padding: "24px clamp(16px, 3vw, 36px)",
+                        boxSizing: "border-box",
+                    }}
+                >
                     <div>
                         <h1>{_t("common|people")} Node Details</h1>
                         <h2>{selectedNodeDetail.node_id}</h2>
@@ -356,7 +369,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                             border: "1px solid var(--cpd-color-border-subtle-primary)",
                             borderRadius: 12,
                             padding: 16,
-                            minHeight: "clamp(420px, 64vh, 920px)",
+                            minHeight: "clamp(520px, 74vh, 1040px)",
                             boxSizing: "border-box",
                             display: "flex",
                             flexDirection: "column",
