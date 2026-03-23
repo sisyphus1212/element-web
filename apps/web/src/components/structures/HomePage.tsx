@@ -29,6 +29,7 @@ import {
     activateCodexThread,
     createCodexThread,
     deleteCodexThread,
+    fetchNodeModels,
     loadNodeBundle,
     updateCodexThread,
 } from "../views/rooms/RoomListPanel/people/api";
@@ -142,6 +143,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [newThreadTitle, setNewThreadTitle] = useState<string>("");
     const [newThreadCwd, setNewThreadCwd] = useState<string>("");
     const [newThreadModel, setNewThreadModel] = useState<string>("");
+    const [newThreadModelOptions, setNewThreadModelOptions] = useState<string[]>([]);
     const [newThreadSandbox, setNewThreadSandbox] = useState<string>("danger-full-access");
     const [newThreadApprovalPolicy, setNewThreadApprovalPolicy] = useState<string>("on-failure");
     const [newThreadPersonality, setNewThreadPersonality] = useState<string>("");
@@ -194,6 +196,26 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     useEffect(() => {
         void refreshSelectedNodeBundle();
     }, [refreshSelectedNodeBundle]);
+
+    useEffect(() => {
+        const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+        if (!nodeId) {
+            setNewThreadModelOptions([]);
+            return;
+        }
+        let cancelled = false;
+        void (async () => {
+            const rows = await fetchNodeModels(nodeId).catch(() => []);
+            if (cancelled) return;
+            setNewThreadModelOptions(rows);
+            if (!String(newThreadModel || "").trim() && rows.length > 0) {
+                setNewThreadModel(rows[0]);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedNodeDetail?.node_id]);
 
     const onCreateThread = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
@@ -499,18 +521,39 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                             </div>
                                             <div>
                                                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Model (optional)</div>
-                                                <input
-                                                    value={newThreadModel}
-                                                    onChange={(e) => setNewThreadModel(e.target.value)}
-                                                    placeholder="gpt-5-codex"
-                                                    style={{
-                                                        width: "100%",
-                                                        boxSizing: "border-box",
-                                                        padding: 10,
-                                                        borderRadius: 8,
-                                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                                    }}
-                                                />
+                                                {newThreadModelOptions.length > 0 ? (
+                                                    <select
+                                                        value={newThreadModel}
+                                                        onChange={(e) => setNewThreadModel(e.target.value)}
+                                                        style={{
+                                                            width: "100%",
+                                                            boxSizing: "border-box",
+                                                            padding: 10,
+                                                            borderRadius: 8,
+                                                            border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                            background: "var(--cpd-color-bg-canvas-default)",
+                                                        }}
+                                                    >
+                                                        {newThreadModelOptions.map((m) => (
+                                                            <option key={m} value={m}>
+                                                                {m}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        value={newThreadModel}
+                                                        onChange={(e) => setNewThreadModel(e.target.value)}
+                                                        placeholder="gpt-5-codex"
+                                                        style={{
+                                                            width: "100%",
+                                                            boxSizing: "border-box",
+                                                            padding: 10,
+                                                            borderRadius: 8,
+                                                            border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                        }}
+                                                    />
+                                                )}
                                             </div>
                                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                                                 <div>

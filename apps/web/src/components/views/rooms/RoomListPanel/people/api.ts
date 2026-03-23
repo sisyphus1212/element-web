@@ -131,6 +131,23 @@ export async function loadNodeBundle(nodeId: string): Promise<NodeBundle> {
     return { controlState, threadItems, runtimeProfiles, nodeDetail };
 }
 
+export async function fetchNodeModels(nodeId: string): Promise<string[]> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/models`, {
+        method: "GET",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok || !Array.isArray(body?.items)) return [];
+    const out: string[] = [];
+    for (const it of body.items) {
+        const mid = String(it || "").trim();
+        if (mid && !out.includes(mid)) out.push(mid);
+    }
+    return out;
+}
+
 export async function switchCodexThread(nodeSessionId: string, codexThreadId: string): Promise<void> {
     const token = await ensureManagerToken();
     const rep = await fetch(`/api/node-sessions/${encodeURIComponent(nodeSessionId)}/switch-codex-thread`, {
