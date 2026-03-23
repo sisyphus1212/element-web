@@ -57,6 +57,8 @@ import { ToggleableIcon } from "./toggle/ToggleableIcon.tsx";
 import { CurrentRightPanelPhaseContextProvider } from "../../../../contexts/CurrentRightPanelPhaseContext.tsx";
 import { LocalRoom } from "../../../../models/LocalRoom.ts";
 import { useIsEncrypted } from "../../../../hooks/useIsEncrypted.ts";
+import dis from "../../../../dispatcher/dispatcher.ts";
+import { Action } from "../../../../dispatcher/actions.ts";
 
 const PEOPLE_THREAD_HISTORY_BACK_CTX_KEY = "mx_people_thread_history_back_ctx";
 
@@ -342,7 +344,7 @@ function RoomHeaderButtons({
         try {
             window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail: { node_id: nodeId } }));
         } catch {}
-        window.location.hash = "/home";
+        dis.dispatch({ action: Action.ViewHomePage, context_switch: true });
     }, []);
 
     return (

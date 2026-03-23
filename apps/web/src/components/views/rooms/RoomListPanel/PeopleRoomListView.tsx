@@ -40,7 +40,7 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
             window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify(detail || {}));
         } catch {}
         window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail }));
-        dis.dispatch({ action: Action.ViewHomePage });
+        dis.dispatch({ action: Action.ViewHomePage, context_switch: true });
     }, []);
 
     const reloadNodes = useCallback(async (): Promise<void> => {
