@@ -32,6 +32,7 @@ import {
     deleteCodexThread,
     fetchNodeModels,
     loadNodeBundle,
+    resolveCodexThreadRoute,
     updateCodexThread,
 } from "../views/rooms/RoomListPanel/people/api";
 
@@ -87,6 +88,7 @@ interface ThreadRowActionsMenuProps {
     onRename: () => void;
     onSetActive: () => void;
     onToggleArchive: () => void;
+    onOpenHistory: () => void;
     onModify: () => void;
     onDelete: () => void;
 }
@@ -99,6 +101,7 @@ const ThreadRowActionsMenu: React.FC<ThreadRowActionsMenuProps> = ({
     onRename,
     onSetActive,
     onToggleArchive,
+    onOpenHistory,
     onModify,
     onDelete,
 }) => {
@@ -117,6 +120,7 @@ const ThreadRowActionsMenu: React.FC<ThreadRowActionsMenuProps> = ({
             }
         >
             <MenuItem label="Info" onSelect={onInfo} />
+            <MenuItem label="历史会话" onSelect={onOpenHistory} disabled={disabled} />
             <MenuItem label="Rename" onSelect={onRename} disabled={disabled} />
             <MenuItem label="Set Active" onSelect={onSetActive} disabled={disabled || archived || active} />
             <MenuItem label={archived ? "Unarchive" : "Archive"} onSelect={onToggleArchive} disabled={disabled} />
@@ -335,6 +339,28 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         [setNewThreadTitle],
     );
 
+    const openThreadHistoryRoom = useCallback(
+        async (threadId: string): Promise<void> => {
+            const nodeId = String(selectedNodeDetail?.node_id || "").trim();
+            const tid = String(threadId || "").trim();
+            if (!nodeId || !tid) return;
+            setThreadDialogBusy(true);
+            setThreadDialogError("");
+            try {
+                const out = await resolveCodexThreadRoute(nodeId, tid);
+                const route = String(out.route || "").trim();
+                if (!route) throw new Error("missing_route");
+                const normalized = route.startsWith("#") ? route : `#${route}`;
+                window.location.hash = normalized.slice(1);
+            } catch (e) {
+                setThreadDialogError(`Open history room failed: ${String((e as Error)?.message || e)}`);
+            } finally {
+                setThreadDialogBusy(false);
+            }
+        },
+        [selectedNodeDetail?.node_id],
+    );
+
     const onApplyThreadSwitch = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
         const nextTid = String(selectedThreadId || "").trim();
@@ -547,6 +573,10 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                                     onToggleArchive={() => {
                                                         setSelectedThreadId(tid);
                                                         void onToggleArchiveThread();
+                                                    }}
+                                                    onOpenHistory={() => {
+                                                        setSelectedThreadId(tid);
+                                                        void openThreadHistoryRoom(tid);
                                                     }}
                                                     onModify={() => openModifyThreadForm(it)}
                                                     onDelete={() => {

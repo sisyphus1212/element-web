@@ -228,6 +228,28 @@ export async function deleteCodexThread(nodeId: string, codexThreadId: string): 
     if (!body?.ok) throw new Error(String(body?.error || "delete_thread_failed"));
 }
 
+export async function resolveCodexThreadRoute(
+    nodeId: string,
+    codexThreadId: string,
+): Promise<{ route: string; matrix_room_id: string; created: boolean }> {
+    const token = await ensureManagerToken();
+    const rep = await fetch(
+        `/api/nodes/${encodeURIComponent(nodeId)}/codex-threads/${encodeURIComponent(codexThreadId)}/resolve-route`,
+        {
+            method: "GET",
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}` },
+        },
+    );
+    const body = await rep.json().catch(() => ({} as any));
+    if (!body?.ok) throw new Error(String(body?.error || "resolve_thread_route_failed"));
+    return {
+        route: String(body?.route || ""),
+        matrix_room_id: String(body?.matrix_room_id || ""),
+        created: Boolean(body?.created),
+    };
+}
+
 export async function applyRuntimeProfile(nodeId: string, runtimeProfileId: string): Promise<void> {
     const token = await ensureManagerToken();
     const rep = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/runtime-profiles/${encodeURIComponent(runtimeProfileId)}/apply`, {
