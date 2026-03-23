@@ -138,8 +138,8 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [selectedThreadId, setSelectedThreadId] = useState<string>("");
     const [threadDialogBusy, setThreadDialogBusy] = useState<boolean>(false);
     const [threadDialogError, setThreadDialogError] = useState<string>("");
-    const [showThreadDialog, setShowThreadDialog] = useState<boolean>(false);
-    const [showCreateDialog, setShowCreateDialog] = useState<boolean>(false);
+    const [showNodeDetailPanel, setShowNodeDetailPanel] = useState<boolean>(false);
+    const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
     const [newThreadTitle, setNewThreadTitle] = useState<string>("");
     const [newThreadCwd, setNewThreadCwd] = useState<string>("");
     const [newThreadModel, setNewThreadModel] = useState<string>("");
@@ -235,7 +235,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                 personality: String(newThreadPersonality || "").trim() || undefined,
             });
             await refreshSelectedNodeBundle();
-            setShowCreateDialog(false);
+            setShowCreateForm(false);
             setNewThreadTitle("");
             setNewThreadCwd("");
             setNewThreadModel("");
@@ -269,7 +269,6 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         try {
             await activateCodexThread(nodeId, nextTid);
             await refreshSelectedNodeBundle();
-            setShowThreadDialog(false);
         } catch (e) {
             setThreadDialogError(`Switch thread failed: ${String((e as Error)?.message || e)}`);
         } finally {
@@ -349,139 +348,127 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                             Hostname: {selectedNodeDetail.display_name || "-"}
                         </div>
                     </div>
-                    <div style={{ width: "min(920px, 100%)", textAlign: "left", border: "1px solid var(--cpd-color-border-subtle-primary)", borderRadius: 12, padding: 16 }}>
-                        <div><b>node_id (System ID):</b> {selectedNodeDetail.node_id}</div>
-                        <div><b>display_name (Hostname):</b> {selectedNodeDetail.display_name || "-"}</div>
-                        <div><b>status:</b> {st}</div>
-                        <div><b>matrix_user_id (MXID):</b> {selectedNodeDetail.matrix_user_id || "-"}</div>
-                        <div><b>last_seen:</b> {lastSeen > 0 ? new Date(lastSeen).toLocaleString() : "-"}</div>
-                        <div><b>active_node_session_id:</b> {selectedNodeDetail.control_state?.active_node_session_id || "-"}</div>
-                        <div><b>active_codex_thread_id:</b> {selectedNodeDetail.control_state?.active_codex_thread_id || "-"}</div>
-                        <div><b>session_key:</b> {selectedNodeDetail.control_state?.session_key || "-"}</div>
-                        <div><b>matrix_room_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_room_id || "-"}</div>
-                        <div><b>matrix_thread_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_thread_id || "-"}</div>
-                        <div><b>threads:</b> {Number(selectedNodeDetail.threads_total || 0)} (archived {Number(selectedNodeDetail.threads_archived || 0)})</div>
-                        <div><b>runtime_profiles:</b> {Number(selectedNodeDetail.runtime_profiles_total || 0)} (default {Number(selectedNodeDetail.runtime_profiles_default || 0)})</div>
+                    <div
+                        style={{
+                            width: "min(920px, 100%)",
+                            textAlign: "left",
+                            border: "1px solid var(--cpd-color-border-subtle-primary)",
+                            borderRadius: 12,
+                            padding: 16,
+                        }}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontWeight: 600, fontSize: 16 }}>
+                                Codex Threads
+                            </div>
+                            <div className="mx_Dialog_buttons">
+                                <AccessibleButton
+                                    element="button"
+                                    kind="secondary"
+                                    onClick={() => setShowNodeDetailPanel(true)}
+                                >
+                                    View Node Details
+                                </AccessibleButton>
+                            </div>
+                        </div>
+                        <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4, marginBottom: 10 }}>
+                            active_codex_thread_id: {activeThreadId || "-"}
+                        </div>
+                        {threadItems.length === 0 ? (
+                            <div className="mx_InlineNotice">{_t("common|no_results")}</div>
+                        ) : (
+                            <div role="listbox" aria-label="Codex thread list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {threadItems.map((it) => {
+                                    const tid = String(it.codex_thread_id || "");
+                                    const selected = Boolean(tid && tid === selectedThreadId);
+                                    const active = Boolean(tid && tid === activeThreadId);
+                                    const archived = Boolean(it.archived);
+                                    const title = String(it.title || "").trim() || tid;
+                                    return (
+                                        <AccessibleButton
+                                            key={tid}
+                                            element="button"
+                                            role="option"
+                                            aria-selected={selected}
+                                            disabled={archived || threadDialogBusy}
+                                            onClick={() => setSelectedThreadId(tid)}
+                                            style={{
+                                                padding: "10px 12px",
+                                                borderRadius: 8,
+                                                border: selected
+                                                    ? "1px solid var(--cpd-color-border-interactive-accent)"
+                                                    : "1px solid var(--cpd-color-border-subtle-primary)",
+                                                background: selected
+                                                    ? "var(--cpd-color-bg-subtle-secondary)"
+                                                    : "var(--cpd-color-bg-canvas-default)",
+                                                textAlign: "left",
+                                                width: "100%",
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                <span style={{ fontWeight: 600 }}>{title}</span>
+                                                <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                                    {active ? "active" : archived ? "archived" : ""}
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: 12, opacity: 0.78 }}>{tid}</div>
+                                        </AccessibleButton>
+                                    );
+                                })}
+                            </div>
+                        )}
                         <div className="mx_Dialog_buttons" style={{ marginTop: 12 }}>
                             <AccessibleButton
                                 element="button"
                                 kind="primary"
-                                onClick={() => {
-                                    setThreadDialogError("");
-                                    setShowThreadDialog(true);
-                                }}
+                                onClick={() => void onApplyThreadSwitch()}
+                                disabled={threadDialogBusy || !selectedThreadId || selectedThreadId === activeThreadId}
                             >
-                                Manage Codex Threads
+                                {threadDialogBusy ? _t("common|loading") : "Set Active"}
+                            </AccessibleButton>
+                            <AccessibleButton
+                                element="button"
+                                kind="secondary"
+                                onClick={() => void onRenameThread()}
+                                disabled={threadDialogBusy || !selectedThreadId}
+                            >
+                                Rename
+                            </AccessibleButton>
+                            <AccessibleButton
+                                element="button"
+                                kind="secondary"
+                                onClick={() => void onToggleArchiveThread()}
+                                disabled={threadDialogBusy || !selectedThreadId}
+                            >
+                                {threadItems.find((it) => String(it.codex_thread_id || "") === selectedThreadId)?.archived
+                                    ? "Unarchive"
+                                    : "Archive"}
+                            </AccessibleButton>
+                            <AccessibleButton
+                                element="button"
+                                kind="secondary"
+                                onClick={() => void onDeleteThread()}
+                                disabled={threadDialogBusy || !selectedThreadId}
+                            >
+                                Delete
+                            </AccessibleButton>
+                            <AccessibleButton
+                                element="button"
+                                kind="secondary"
+                                onClick={() => setShowCreateForm((v) => !v)}
+                            >
+                                {showCreateForm ? "Hide Create" : _t("action|create")}
                             </AccessibleButton>
                         </div>
-                    </div>
-                    {showThreadDialog ? (
-                        <div className="mx_Dialog_wrapper">
-                            <div className="mx_Dialog_background" onClick={() => setShowThreadDialog(false)} />
-                            <div className="mx_Dialog_border">
-                                <div className="mx_Dialog mx_Dialog_fixedWidth">
-                                    <div className="mx_Dialog_header">
-                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Manage Codex Threads - {selectedNodeDetail.node_id}</h1>
-                                    </div>
-                                    <div className="mx_Dialog_content" style={{ maxHeight: 420, overflowY: "auto" }}>
-                                        {threadItems.length === 0 ? (
-                                            <div className="mx_InlineNotice">{_t("common|no_results")}</div>
-                                        ) : (
-                                            <div role="listbox" aria-label="Codex thread list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                                {threadItems.map((it) => {
-                                                    const tid = String(it.codex_thread_id || "");
-                                                    const selected = Boolean(tid && tid === selectedThreadId);
-                                                    const active = Boolean(tid && tid === activeThreadId);
-                                                    const archived = Boolean(it.archived);
-                                                    const title = String(it.title || "").trim() || tid;
-                                                    return (
-                                                        <AccessibleButton
-                                                            key={tid}
-                                                            element="button"
-                                                            role="option"
-                                                            aria-selected={selected}
-                                                            disabled={archived || threadDialogBusy}
-                                                            onClick={() => setSelectedThreadId(tid)}
-                                                            style={{
-                                                                padding: "10px 12px",
-                                                                borderRadius: 8,
-                                                                border: selected
-                                                                    ? "1px solid var(--cpd-color-border-interactive-accent)"
-                                                                    : "1px solid var(--cpd-color-border-subtle-primary)",
-                                                                background: selected
-                                                                    ? "var(--cpd-color-bg-subtle-secondary)"
-                                                                    : "var(--cpd-color-bg-canvas-default)",
-                                                                textAlign: "left",
-                                                                width: "100%",
-                                                            }}
-                                                        >
-                                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                                                <span style={{ fontWeight: 600 }}>{title}</span>
-                                                                <span style={{ fontSize: 12, opacity: 0.8 }}>
-                                                                    {active ? "active" : archived ? "archived" : ""}
-                                                                </span>
-                                                            </div>
-                                                            <div style={{ fontSize: 12, opacity: 0.78 }}>{tid}</div>
-                                                        </AccessibleButton>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        {threadDialogError ? (
-                                            <div className="mx_InlineError" style={{ marginTop: 12 }}>
-                                                {threadDialogError}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                    <div className="mx_Dialog_buttons">
-                                        <AccessibleButton
-                                            element="button"
-                                            kind="secondary"
-                                            onClick={() => void onRenameThread()}
-                                            disabled={threadDialogBusy || !selectedThreadId}
-                                        >
-                                            Rename
-                                        </AccessibleButton>
-                                        <AccessibleButton
-                                            element="button"
-                                            kind="secondary"
-                                            onClick={() => void onToggleArchiveThread()}
-                                            disabled={threadDialogBusy || !selectedThreadId}
-                                        >
-                                            {threadItems.find((it) => String(it.codex_thread_id || "") === selectedThreadId)?.archived
-                                                ? "Unarchive"
-                                                : "Archive"}
-                                        </AccessibleButton>
-                                        <AccessibleButton
-                                            element="button"
-                                            kind="secondary"
-                                            onClick={() => void onDeleteThread()}
-                                            disabled={threadDialogBusy || !selectedThreadId}
-                                        >
-                                            Delete
-                                        </AccessibleButton>
-                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(true)}>
-                                            {_t("action|create")}
-                                        </AccessibleButton>
-                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowThreadDialog(false)}>
-                                            {_t("action|cancel")}
-                                        </AccessibleButton>
-                                        <AccessibleButton
-                                            element="button"
-                                            kind="primary"
-                                            onClick={() => void onApplyThreadSwitch()}
-                                            disabled={threadDialogBusy || !selectedThreadId || selectedThreadId === activeThreadId}
-                                        >
-                                            {threadDialogBusy ? _t("common|loading") : _t("action|apply")}
-                                        </AccessibleButton>
-                                    </div>
-                                </div>
+                        {threadDialogError ? (
+                            <div className="mx_InlineError" style={{ marginTop: 12 }}>
+                                {threadDialogError}
                             </div>
-                        </div>
-                    ) : null}
-                    {showCreateDialog ? (
+                        ) : null}
+                    </div>
+                    {showCreateForm ? (
                         <div className="mx_Dialog_wrapper">
-                            <div className="mx_Dialog_background" onClick={() => setShowCreateDialog(false)} />
+                            <div className="mx_Dialog_background" onClick={() => setShowCreateForm(false)} />
                             <div className="mx_Dialog_border">
                                 <div className="mx_Dialog mx_Dialog_fixedWidth">
                                     <div className="mx_Dialog_header">
@@ -621,7 +608,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                         </div>
                                     </div>
                                     <div className="mx_Dialog_buttons">
-                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(false)}>
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateForm(false)}>
                                             {_t("action|cancel")}
                                         </AccessibleButton>
                                         <AccessibleButton
@@ -631,6 +618,37 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                             disabled={threadDialogBusy || !String(newThreadTitle || "").trim()}
                                         >
                                             {threadDialogBusy ? _t("common|loading") : _t("action|create")}
+                                        </AccessibleButton>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {showNodeDetailPanel ? (
+                        <div className="mx_Dialog_wrapper">
+                            <div className="mx_Dialog_background" onClick={() => setShowNodeDetailPanel(false)} />
+                            <div className="mx_Dialog_border" style={{ marginLeft: "auto", marginRight: 0, height: "100%" }}>
+                                <div className="mx_Dialog" style={{ width: "min(720px, 100vw)", height: "100%", overflowY: "auto" }}>
+                                    <div className="mx_Dialog_header">
+                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Node Details - {selectedNodeDetail.node_id}</h1>
+                                    </div>
+                                    <div className="mx_Dialog_content" style={{ lineHeight: 1.7 }}>
+                                        <div><b>node_id (System ID):</b> {selectedNodeDetail.node_id}</div>
+                                        <div><b>display_name (Hostname):</b> {selectedNodeDetail.display_name || "-"}</div>
+                                        <div><b>status:</b> {st}</div>
+                                        <div><b>matrix_user_id (MXID):</b> {selectedNodeDetail.matrix_user_id || "-"}</div>
+                                        <div><b>last_seen:</b> {lastSeen > 0 ? new Date(lastSeen).toLocaleString() : "-"}</div>
+                                        <div><b>active_node_session_id:</b> {selectedNodeDetail.control_state?.active_node_session_id || "-"}</div>
+                                        <div><b>active_codex_thread_id:</b> {selectedNodeDetail.control_state?.active_codex_thread_id || "-"}</div>
+                                        <div><b>session_key:</b> {selectedNodeDetail.control_state?.session_key || "-"}</div>
+                                        <div><b>matrix_room_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_room_id || "-"}</div>
+                                        <div><b>matrix_thread_id:</b> {selectedNodeDetail.control_state?.matrix_route?.matrix_thread_id || "-"}</div>
+                                        <div><b>threads:</b> {Number(selectedNodeDetail.threads_total || 0)} (archived {Number(selectedNodeDetail.threads_archived || 0)})</div>
+                                        <div><b>runtime_profiles:</b> {Number(selectedNodeDetail.runtime_profiles_total || 0)} (default {Number(selectedNodeDetail.runtime_profiles_default || 0)})</div>
+                                    </div>
+                                    <div className="mx_Dialog_buttons">
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setShowNodeDetailPanel(false)}>
+                                            {_t("action|close")}
                                         </AccessibleButton>
                                     </div>
                                 </div>
