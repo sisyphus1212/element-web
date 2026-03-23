@@ -350,11 +350,16 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                     </div>
                     <div
                         style={{
-                            width: "min(920px, 100%)",
+                            width: "100%",
+                            maxWidth: "none",
                             textAlign: "left",
                             border: "1px solid var(--cpd-color-border-subtle-primary)",
                             borderRadius: 12,
                             padding: 16,
+                            minHeight: "clamp(420px, 64vh, 920px)",
+                            boxSizing: "border-box",
+                            display: "flex",
+                            flexDirection: "column",
                         }}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -377,7 +382,19 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                         {threadItems.length === 0 ? (
                             <div className="mx_InlineNotice">{_t("common|no_results")}</div>
                         ) : (
-                            <div role="listbox" aria-label="Codex thread list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div
+                                role="listbox"
+                                aria-label="Codex thread list"
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 8,
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflowY: "auto",
+                                    paddingRight: 4,
+                                }}
+                            >
                                 {threadItems.map((it) => {
                                     const tid = String(it.codex_thread_id || "");
                                     const selected = Boolean(tid && tid === selectedThreadId);
