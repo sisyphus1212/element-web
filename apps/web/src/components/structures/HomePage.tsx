@@ -8,7 +8,7 @@ Please see LICENSE files in the repository root for full details.
 
 import React, { type JSX } from "react";
 import { useCallback, useContext, useEffect, useState } from "react";
-import { ChatSolidIcon, ExploreIcon, GroupIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
+import { ChatSolidIcon, ExploreIcon, GroupIcon, OverflowHorizontalIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 
 import AutoHideScrollbar from "./AutoHideScrollbar";
 import { getHomePageUrl } from "../../utils/pages";
@@ -33,6 +33,8 @@ import {
     loadNodeBundle,
     updateCodexThread,
 } from "../views/rooms/RoomListPanel/people/api";
+import { ContextMenuTooltipButton, aboveLeftOf, useContextMenu } from "./ContextMenu";
+import IconizedContextMenu, { IconizedContextMenuOption, IconizedContextMenuOptionList } from "../views/context_menus/IconizedContextMenu";
 
 const onClickSendDm = (ev: ButtonEvent): void => {
     PosthogTrackers.trackInteraction("WebHomeCreateChatButton", ev);
@@ -71,6 +73,110 @@ interface PeopleSelectedNodeDetail {
         matrix_route?: { matrix_room_id?: string; matrix_thread_id?: string };
     };
 }
+
+interface ThreadItem {
+    codex_thread_id: string;
+    title: string;
+    archived: boolean;
+}
+
+interface ThreadRowActionsMenuProps {
+    item: ThreadItem;
+    active: boolean;
+    busy: boolean;
+    onInfo: () => void;
+    onRename: () => void;
+    onSetActive: () => void;
+    onToggleArchive: () => void;
+    onModify: () => void;
+    onDelete: () => void;
+}
+
+const ThreadRowActionsMenu: React.FC<ThreadRowActionsMenuProps> = ({
+    item,
+    active,
+    busy,
+    onInfo,
+    onRename,
+    onSetActive,
+    onToggleArchive,
+    onModify,
+    onDelete,
+}) => {
+    const [menuDisplayed, handle, openMenu, closeMenu] = useContextMenu<HTMLButtonElement>();
+    const archived = Boolean(item.archived);
+    const disabled = Boolean(busy);
+
+    return (
+        <>
+            <ContextMenuTooltipButton
+                className="mx_RoomTile_menuButton"
+                onClick={openMenu}
+                title="Thread actions"
+                isExpanded={menuDisplayed}
+                inputRef={handle}
+                disabled={disabled}
+                tabIndex={0}
+            >
+                <OverflowHorizontalIcon />
+            </ContextMenuTooltipButton>
+            {menuDisplayed && handle.current && (
+                <IconizedContextMenu {...aboveLeftOf(handle.current.getBoundingClientRect())} onFinished={closeMenu}>
+                    <IconizedContextMenuOptionList first>
+                        <IconizedContextMenuOption
+                            label="Info"
+                            onClick={() => {
+                                closeMenu();
+                                onInfo();
+                            }}
+                        />
+                        <IconizedContextMenuOption
+                            label="Rename"
+                            onClick={() => {
+                                closeMenu();
+                                onRename();
+                            }}
+                            disabled={disabled}
+                        />
+                        <IconizedContextMenuOption
+                            label="Set Active"
+                            onClick={() => {
+                                closeMenu();
+                                onSetActive();
+                            }}
+                            disabled={disabled || archived || active}
+                        />
+                        <IconizedContextMenuOption
+                            label={archived ? "Unarchive" : "Archive"}
+                            onClick={() => {
+                                closeMenu();
+                                onToggleArchive();
+                            }}
+                            disabled={disabled}
+                        />
+                        <IconizedContextMenuOption
+                            label="Modify"
+                            onClick={() => {
+                                closeMenu();
+                                onModify();
+                            }}
+                            disabled={disabled}
+                        />
+                        <IconizedContextMenuOption
+                            label="Delete"
+                            onClick={() => {
+                                closeMenu();
+                                onDelete();
+                            }}
+                            isDestructive
+                            disabled={disabled}
+                        />
+                    </IconizedContextMenuOptionList>
+                </IconizedContextMenu>
+            )}
+        </>
+    );
+};
 
 const loadSelectedNodeDetail = (): PeopleSelectedNodeDetail | null => {
     try {
@@ -140,6 +246,9 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [threadDialogError, setThreadDialogError] = useState<string>("");
     const [showNodeDetailPanel, setShowNodeDetailPanel] = useState<boolean>(false);
     const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
+    const [threadFormMode, setThreadFormMode] = useState<"create" | "modify">("create");
+    const [threadFormFromId, setThreadFormFromId] = useState<string>("");
+    const [threadInfoTid, setThreadInfoTid] = useState<string>("");
     const [newThreadTitle, setNewThreadTitle] = useState<string>("");
     const [newThreadCwd, setNewThreadCwd] = useState<string>("");
     const [newThreadModel, setNewThreadModel] = useState<string>("");
@@ -215,7 +324,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         return () => {
             cancelled = true;
         };
-    }, [selectedNodeDetail?.node_id]);
+    }, [newThreadModel, selectedNodeDetail?.node_id]);
 
     const onCreateThread = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
@@ -259,6 +368,24 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         refreshSelectedNodeBundle,
         selectedNodeDetail?.node_id,
     ]);
+
+    const openCreateThreadForm = useCallback((): void => {
+        setThreadFormMode("create");
+        setThreadFormFromId("");
+        setShowCreateForm(true);
+    }, []);
+
+    const openModifyThreadForm = useCallback(
+        (thread: ThreadItem): void => {
+            const tid = String(thread.codex_thread_id || "").trim();
+            const title = String(thread.title || "").trim();
+            setThreadFormMode("modify");
+            setThreadFormFromId(tid);
+            setNewThreadTitle(title ? `${title}-copy` : "");
+            setShowCreateForm(true);
+        },
+        [setNewThreadTitle],
+    );
 
     const onApplyThreadSwitch = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
@@ -387,6 +514,9 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                 >
                                     View Node Details
                                 </AccessibleButton>
+                                <AccessibleButton element="button" kind="secondary" onClick={openCreateThreadForm}>
+                                    Create Thread
+                                </AccessibleButton>
                             </div>
                         </div>
                         <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4, marginBottom: 10 }}>
@@ -415,13 +545,8 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                     const archived = Boolean(it.archived);
                                     const title = String(it.title || "").trim() || tid;
                                     return (
-                                        <AccessibleButton
+                                        <div
                                             key={tid}
-                                            element="button"
-                                            role="option"
-                                            aria-selected={selected}
-                                            disabled={archived || threadDialogBusy}
-                                            onClick={() => setSelectedThreadId(tid)}
                                             style={{
                                                 padding: "10px 12px",
                                                 borderRadius: 8,
@@ -431,80 +556,114 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                                 background: selected
                                                     ? "var(--cpd-color-bg-subtle-secondary)"
                                                     : "var(--cpd-color-bg-canvas-default)",
-                                                textAlign: "left",
                                                 width: "100%",
+                                                boxSizing: "border-box",
+                                                display: "flex",
+                                                gap: 8,
+                                                alignItems: "flex-start",
                                             }}
                                         >
-                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                                <span style={{ fontWeight: 600 }}>{title}</span>
-                                                <span style={{ fontSize: 12, opacity: 0.8 }}>
-                                                    {active ? "active" : archived ? "archived" : ""}
-                                                </span>
+                                            <AccessibleButton
+                                                element="button"
+                                                role="option"
+                                                aria-selected={selected}
+                                                onClick={() => setSelectedThreadId(tid)}
+                                                style={{
+                                                    textAlign: "left",
+                                                    minWidth: 0,
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                    <span style={{ fontWeight: 600 }}>{title}</span>
+                                                    <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                                        {active ? "active" : archived ? "archived" : ""}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: 12, opacity: 0.78 }}>{tid}</div>
+                                            </AccessibleButton>
+                                            <div>
+                                                <ThreadRowActionsMenu
+                                                    item={it}
+                                                    active={active}
+                                                    busy={threadDialogBusy}
+                                                    onInfo={() => setThreadInfoTid(tid)}
+                                                    onRename={() => {
+                                                        setSelectedThreadId(tid);
+                                                        void onRenameThread();
+                                                    }}
+                                                    onSetActive={() => {
+                                                        setSelectedThreadId(tid);
+                                                        void onApplyThreadSwitch();
+                                                    }}
+                                                    onToggleArchive={() => {
+                                                        setSelectedThreadId(tid);
+                                                        void onToggleArchiveThread();
+                                                    }}
+                                                    onModify={() => openModifyThreadForm(it)}
+                                                    onDelete={() => {
+                                                        setSelectedThreadId(tid);
+                                                        void onDeleteThread();
+                                                    }}
+                                                />
                                             </div>
-                                            <div style={{ fontSize: 12, opacity: 0.78 }}>{tid}</div>
-                                        </AccessibleButton>
+                                        </div>
                                     );
                                 })}
                             </div>
                         )}
-                        <div className="mx_Dialog_buttons" style={{ marginTop: 12 }}>
-                            <AccessibleButton
-                                element="button"
-                                kind="primary"
-                                onClick={() => void onApplyThreadSwitch()}
-                                disabled={threadDialogBusy || !selectedThreadId || selectedThreadId === activeThreadId}
-                            >
-                                {threadDialogBusy ? _t("common|loading") : "Set Active"}
-                            </AccessibleButton>
-                            <AccessibleButton
-                                element="button"
-                                kind="secondary"
-                                onClick={() => void onRenameThread()}
-                                disabled={threadDialogBusy || !selectedThreadId}
-                            >
-                                Rename
-                            </AccessibleButton>
-                            <AccessibleButton
-                                element="button"
-                                kind="secondary"
-                                onClick={() => void onToggleArchiveThread()}
-                                disabled={threadDialogBusy || !selectedThreadId}
-                            >
-                                {threadItems.find((it) => String(it.codex_thread_id || "") === selectedThreadId)?.archived
-                                    ? "Unarchive"
-                                    : "Archive"}
-                            </AccessibleButton>
-                            <AccessibleButton
-                                element="button"
-                                kind="secondary"
-                                onClick={() => void onDeleteThread()}
-                                disabled={threadDialogBusy || !selectedThreadId}
-                            >
-                                Delete
-                            </AccessibleButton>
-                            <AccessibleButton
-                                element="button"
-                                kind="secondary"
-                                onClick={() => setShowCreateForm((v) => !v)}
-                            >
-                                {showCreateForm ? "Hide Create" : _t("action|create")}
-                            </AccessibleButton>
-                        </div>
                         {threadDialogError ? (
                             <div className="mx_InlineError" style={{ marginTop: 12 }}>
                                 {threadDialogError}
                             </div>
                         ) : null}
                     </div>
+                    {threadInfoTid ? (
+                        <div className="mx_Dialog_wrapper">
+                            <div className="mx_Dialog_background" onClick={() => setThreadInfoTid("")} />
+                            <div className="mx_Dialog_border">
+                                <div className="mx_Dialog mx_Dialog_fixedWidth">
+                                    <div className="mx_Dialog_header">
+                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Codex Thread Info</h1>
+                                    </div>
+                                    <div className="mx_Dialog_content">
+                                        {(() => {
+                                            const row = threadItems.find((it) => String(it.codex_thread_id || "") === threadInfoTid);
+                                            return (
+                                                <div style={{ display: "grid", gap: 8 }}>
+                                                    <div><b>title:</b> {String(row?.title || row?.codex_thread_id || "-")}</div>
+                                                    <div><b>codex_thread_id:</b> {threadInfoTid}</div>
+                                                    <div><b>state:</b> {row?.archived ? "archived" : "normal"}</div>
+                                                    <div><b>active:</b> {threadInfoTid === activeThreadId ? "yes" : "no"}</div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div className="mx_Dialog_buttons">
+                                        <AccessibleButton element="button" kind="secondary" onClick={() => setThreadInfoTid("")}>
+                                            Close
+                                        </AccessibleButton>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
                     {showCreateForm ? (
                         <div className="mx_Dialog_wrapper">
                             <div className="mx_Dialog_background" onClick={() => setShowCreateForm(false)} />
                             <div className="mx_Dialog_border">
                                 <div className="mx_Dialog mx_Dialog_fixedWidth">
                                     <div className="mx_Dialog_header">
-                                        <h1 className="mx_Heading_h3 mx_Dialog_title">Create Codex Thread</h1>
+                                        <h1 className="mx_Heading_h3 mx_Dialog_title">
+                                            {threadFormMode === "modify" ? "Modify (Create Derived Thread)" : "Create Codex Thread"}
+                                        </h1>
                                     </div>
                                     <div className="mx_Dialog_content">
+                                        {threadFormMode === "modify" ? (
+                                            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>
+                                                Source thread: {threadFormFromId || "-"}
+                                            </div>
+                                        ) : null}
                                         <div style={{ display: "grid", gap: 10 }}>
                                             <div>
                                                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Title</div>
