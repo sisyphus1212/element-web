@@ -39,7 +39,15 @@ export const PeopleRoomListView: React.FC = (): JSX.Element => {
         try {
             window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify(detail || {}));
         } catch {}
-        window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail }));
+        window.dispatchEvent(
+            new CustomEvent("mx_people_node_detail_changed", {
+                detail: {
+                    ...detail,
+                    __source: "people_list_click",
+                    __ts: Date.now(),
+                },
+            }),
+        );
         dis.dispatch({ action: Action.ViewHomePage, context_switch: true });
     }, []);
 

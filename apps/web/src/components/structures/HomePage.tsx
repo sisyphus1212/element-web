@@ -74,6 +74,11 @@ interface PeopleSelectedNodeDetail {
     };
 }
 
+interface PeopleNodeDetailChangedEventDetail extends Partial<PeopleSelectedNodeDetail> {
+    __source?: string;
+    __ts?: number;
+}
+
 interface ThreadItem {
     codex_thread_id: string;
     title: string;
@@ -228,22 +233,18 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
 
     useEffect(() => {
         const onNodeDetailChanged = (ev: Event): void => {
-            const ce = ev as CustomEvent<PeopleSelectedNodeDetail | null>;
-            if (ce?.detail && typeof ce.detail === "object") {
-                setSelectedNodeDetail(ce.detail);
-                return;
-            }
-            setSelectedNodeDetail(loadSelectedNodeDetail());
-        };
-        const onStorage = (ev: StorageEvent): void => {
-            if (ev.key !== "mx_people_selected_node_detail") return;
-            setSelectedNodeDetail(loadSelectedNodeDetail());
+            const ce = ev as CustomEvent<PeopleNodeDetailChangedEventDetail | null>;
+            const detail = ce?.detail;
+            if (!detail || typeof detail !== "object") return;
+            const source = String(detail.__source || "").trim();
+            if (source !== "people_list_click" && source !== "thread_history_back") return;
+            const nodeId = String(detail.node_id || "").trim();
+            if (!nodeId) return;
+            setSelectedNodeDetail(detail as PeopleSelectedNodeDetail);
         };
         window.addEventListener("mx_people_node_detail_changed", onNodeDetailChanged as EventListener);
-        window.addEventListener("storage", onStorage);
         return () => {
             window.removeEventListener("mx_people_node_detail_changed", onNodeDetailChanged as EventListener);
-            window.removeEventListener("storage", onStorage);
         };
     }, []);
 

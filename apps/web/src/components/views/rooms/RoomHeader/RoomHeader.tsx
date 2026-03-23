@@ -342,7 +342,11 @@ function RoomHeaderButtons({
             window.sessionStorage.removeItem(PEOPLE_THREAD_HISTORY_BACK_CTX_KEY);
         } catch {}
         try {
-            window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail: { node_id: nodeId } }));
+            window.dispatchEvent(
+                new CustomEvent("mx_people_node_detail_changed", {
+                    detail: { node_id: nodeId, __source: "thread_history_back", __ts: Date.now() },
+                }),
+            );
         } catch {}
         dis.dispatch({ action: Action.ViewHomePage, context_switch: true });
     }, []);
