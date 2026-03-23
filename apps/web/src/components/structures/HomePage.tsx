@@ -80,6 +80,8 @@ interface ThreadItem {
     archived: boolean;
 }
 
+const PEOPLE_THREAD_HISTORY_BACK_CTX_KEY = "mx_people_thread_history_back_ctx";
+
 interface ThreadRowActionsMenuProps {
     item: ThreadItem;
     active: boolean;
@@ -350,6 +352,17 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                 const out = await resolveCodexThreadRoute(nodeId, tid);
                 const route = String(out.route || "").trim();
                 if (!route) throw new Error("missing_route");
+                try {
+                    window.sessionStorage.setItem(
+                        PEOPLE_THREAD_HISTORY_BACK_CTX_KEY,
+                        JSON.stringify({
+                            node_id: nodeId,
+                            matrix_room_id: String(out.matrix_room_id || "").trim(),
+                            from: "people_node_details",
+                            ts: Date.now(),
+                        }),
+                    );
+                } catch {}
                 const normalized = route.startsWith("#") ? route : `#${route}`;
                 window.location.hash = normalized.slice(1);
             } catch (e) {

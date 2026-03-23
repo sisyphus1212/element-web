@@ -58,6 +58,27 @@ import { CurrentRightPanelPhaseContextProvider } from "../../../../contexts/Curr
 import { LocalRoom } from "../../../../models/LocalRoom.ts";
 import { useIsEncrypted } from "../../../../hooks/useIsEncrypted.ts";
 
+const PEOPLE_THREAD_HISTORY_BACK_CTX_KEY = "mx_people_thread_history_back_ctx";
+
+interface ThreadHistoryBackCtx {
+    node_id: string;
+    matrix_room_id: string;
+}
+
+function readThreadHistoryBackCtx(): ThreadHistoryBackCtx | null {
+    try {
+        const raw = String(window.sessionStorage.getItem(PEOPLE_THREAD_HISTORY_BACK_CTX_KEY) || "").trim();
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const nodeId = String(parsed?.node_id || "").trim();
+        const roomId = String(parsed?.matrix_room_id || "").trim();
+        if (!nodeId || !roomId) return null;
+        return { node_id: nodeId, matrix_room_id: roomId };
+    } catch {
+        return null;
+    }
+}
+
 function RoomHeaderButtons({
     room,
     additionalButtons,
@@ -295,8 +316,43 @@ function RoomHeaderButtons({
         isVideoRoom ||
         roomContext.mainSplitContentType === MainSplitContentType.MaximisedWidget ||
         roomContext.mainSplitContentType === MainSplitContentType.Call;
+    const backCtx = readThreadHistoryBackCtx();
+    const showBackToNodeDetails = Boolean(
+        backCtx && String(backCtx.matrix_room_id) === String(room.roomId || "") && String(backCtx.node_id || "").trim(),
+    );
+
+    const onBackToNodeDetails = useCallback((): void => {
+        const ctx = readThreadHistoryBackCtx();
+        const nodeId = String(ctx?.node_id || "").trim();
+        if (!nodeId) return;
+        try {
+            const curRaw = String(window.localStorage.getItem("mx_people_selected_node_detail") || "").trim();
+            if (curRaw) {
+                const cur = JSON.parse(curRaw);
+                if (String(cur?.node_id || "").trim() !== nodeId) {
+                    window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify({ node_id: nodeId }));
+                }
+            } else {
+                window.localStorage.setItem("mx_people_selected_node_detail", JSON.stringify({ node_id: nodeId }));
+            }
+        } catch {}
+        try {
+            window.sessionStorage.removeItem(PEOPLE_THREAD_HISTORY_BACK_CTX_KEY);
+        } catch {}
+        try {
+            window.dispatchEvent(new CustomEvent("mx_people_node_detail_changed", { detail: { node_id: nodeId } }));
+        } catch {}
+        window.location.hash = "/home";
+    }, []);
+
     return (
         <>
+            {showBackToNodeDetails && (
+                <Button size="sm" onClick={onBackToNodeDetails} color="secondary" aria-label="Back to Node Details">
+                    Back to Node Details
+                </Button>
+            )}
+
             {additionalButtons?.map((props) => {
                 const label = props.label();
 
