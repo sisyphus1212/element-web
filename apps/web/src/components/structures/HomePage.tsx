@@ -9,6 +9,7 @@ Please see LICENSE files in the repository root for full details.
 import React, { type JSX } from "react";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { ChatSolidIcon, ExploreIcon, GroupIcon, OverflowHorizontalIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
+import { IconButton, Menu, MenuItem } from "@vector-im/compound-web";
 
 import AutoHideScrollbar from "./AutoHideScrollbar";
 import { getHomePageUrl } from "../../utils/pages";
@@ -33,8 +34,6 @@ import {
     loadNodeBundle,
     updateCodexThread,
 } from "../views/rooms/RoomListPanel/people/api";
-import { ContextMenuTooltipButton, aboveLeftOf, useContextMenu } from "./ContextMenu";
-import IconizedContextMenu, { IconizedContextMenuOption, IconizedContextMenuOptionList } from "../views/context_menus/IconizedContextMenu";
 
 const onClickSendDm = (ev: ButtonEvent): void => {
     PosthogTrackers.trackInteraction("WebHomeCreateChatButton", ev);
@@ -103,78 +102,27 @@ const ThreadRowActionsMenu: React.FC<ThreadRowActionsMenuProps> = ({
     onModify,
     onDelete,
 }) => {
-    const [menuDisplayed, handle, openMenu, closeMenu] = useContextMenu<HTMLButtonElement>();
     const archived = Boolean(item.archived);
     const disabled = Boolean(busy);
 
     return (
-        <>
-            <ContextMenuTooltipButton
-                className="mx_RoomTile_menuButton"
-                onClick={openMenu}
-                title="Thread actions"
-                isExpanded={menuDisplayed}
-                inputRef={handle}
-                disabled={disabled}
-                tabIndex={0}
-            >
-                <OverflowHorizontalIcon />
-            </ContextMenuTooltipButton>
-            {menuDisplayed && handle.current && (
-                <IconizedContextMenu {...aboveLeftOf(handle.current.getBoundingClientRect())} onFinished={closeMenu}>
-                    <IconizedContextMenuOptionList first>
-                        <IconizedContextMenuOption
-                            label="Info"
-                            onClick={() => {
-                                closeMenu();
-                                onInfo();
-                            }}
-                        />
-                        <IconizedContextMenuOption
-                            label="Rename"
-                            onClick={() => {
-                                closeMenu();
-                                onRename();
-                            }}
-                            disabled={disabled}
-                        />
-                        <IconizedContextMenuOption
-                            label="Set Active"
-                            onClick={() => {
-                                closeMenu();
-                                onSetActive();
-                            }}
-                            disabled={disabled || archived || active}
-                        />
-                        <IconizedContextMenuOption
-                            label={archived ? "Unarchive" : "Archive"}
-                            onClick={() => {
-                                closeMenu();
-                                onToggleArchive();
-                            }}
-                            disabled={disabled}
-                        />
-                        <IconizedContextMenuOption
-                            label="Modify"
-                            onClick={() => {
-                                closeMenu();
-                                onModify();
-                            }}
-                            disabled={disabled}
-                        />
-                        <IconizedContextMenuOption
-                            label="Delete"
-                            onClick={() => {
-                                closeMenu();
-                                onDelete();
-                            }}
-                            isDestructive
-                            disabled={disabled}
-                        />
-                    </IconizedContextMenuOptionList>
-                </IconizedContextMenu>
-            )}
-        </>
+        <Menu
+            align="start"
+            side="bottom"
+            title="More Options"
+            trigger={
+                <IconButton aria-label="More Options" size="24px" disabled={disabled}>
+                    <OverflowHorizontalIcon />
+                </IconButton>
+            }
+        >
+            <MenuItem label="Info" onSelect={onInfo} />
+            <MenuItem label="Rename" onSelect={onRename} disabled={disabled} />
+            <MenuItem label="Set Active" onSelect={onSetActive} disabled={disabled || archived || active} />
+            <MenuItem label={archived ? "Unarchive" : "Archive"} onSelect={onToggleArchive} disabled={disabled} />
+            <MenuItem label="Modify" onSelect={onModify} disabled={disabled} />
+            <MenuItem label="Delete" onSelect={onDelete} kind="critical" disabled={disabled} />
+        </Menu>
     );
 };
 
