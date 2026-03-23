@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React, { type JSX } from "react";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ChatSolidIcon, ExploreIcon, GroupIcon, OverflowHorizontalIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 import { IconButton, Menu, MenuItem } from "@vector-im/compound-web";
 
@@ -211,8 +211,15 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [newThreadApprovalPolicy, setNewThreadApprovalPolicy] = useState<string>("on-failure");
     const [newThreadPersonality, setNewThreadPersonality] = useState<string>("");
     const [newThreadSetActive, setNewThreadSetActive] = useState<boolean>(true);
+    const bundleReqSeqRef = useRef<number>(0);
+    const selectedNodeIdRef = useRef<string>(String(selectedNodeDetail?.node_id || "").trim());
+
+    useEffect(() => {
+        selectedNodeIdRef.current = String(selectedNodeDetail?.node_id || "").trim();
+    }, [selectedNodeDetail?.node_id]);
 
     const clearSelectedNodeDetail = useCallback((): void => {
+        bundleReqSeqRef.current += 1;
         try {
             window.localStorage.removeItem("mx_people_selected_node_detail");
         } catch {}
@@ -243,7 +250,37 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const refreshSelectedNodeBundle = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
         if (!nodeId) return;
+        const reqSeq = bundleReqSeqRef.current + 1;
+        bundleReqSeqRef.current = reqSeq;
+        console.debug("[people.bundle] req_start", { req_seq: reqSeq, requested_node_id: nodeId });
         const bundle = await loadNodeBundle(nodeId);
+        if (reqSeq !== bundleReqSeqRef.current) {
+            console.debug("[people.bundle] req_drop_stale", {
+                req_seq: reqSeq,
+                requested_node_id: nodeId,
+                reason: "not_latest_seq",
+            });
+            return;
+        }
+        if (selectedNodeIdRef.current !== nodeId) {
+            console.debug("[people.bundle] req_drop_stale", {
+                req_seq: reqSeq,
+                requested_node_id: nodeId,
+                current_node_id: selectedNodeIdRef.current,
+                reason: "selected_node_changed",
+            });
+            return;
+        }
+        const responseNodeId = String(bundle.nodeDetail?.node_id || "").trim();
+        if (responseNodeId && responseNodeId !== nodeId) {
+            console.error("[people.bundle] req_drop_stale", {
+                req_seq: reqSeq,
+                requested_node_id: nodeId,
+                response_node_id: responseNodeId,
+                reason: "response_node_mismatch",
+            });
+            return;
+        }
         const nextActiveTid = String(bundle.controlState?.active_codex_thread_id || "");
         setThreadItems(Array.isArray(bundle.threadItems) ? bundle.threadItems : []);
         setActiveThreadId(nextActiveTid);
@@ -254,6 +291,11 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
             } catch {}
             setSelectedNodeDetail(bundle.nodeDetail);
         }
+        console.debug("[people.bundle] req_apply", {
+            req_seq: reqSeq,
+            requested_node_id: nodeId,
+            response_node_id: responseNodeId || nodeId,
+        });
     }, [selectedNodeDetail?.node_id]);
 
     useEffect(() => {
