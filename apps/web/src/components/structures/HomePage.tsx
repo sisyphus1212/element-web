@@ -140,6 +140,12 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
     const [showThreadDialog, setShowThreadDialog] = useState<boolean>(false);
     const [showCreateDialog, setShowCreateDialog] = useState<boolean>(false);
     const [newThreadTitle, setNewThreadTitle] = useState<string>("");
+    const [newThreadCwd, setNewThreadCwd] = useState<string>("");
+    const [newThreadModel, setNewThreadModel] = useState<string>("");
+    const [newThreadSandbox, setNewThreadSandbox] = useState<string>("danger-full-access");
+    const [newThreadApprovalPolicy, setNewThreadApprovalPolicy] = useState<string>("on-failure");
+    const [newThreadPersonality, setNewThreadPersonality] = useState<string>("");
+    const [newThreadSetActive, setNewThreadSetActive] = useState<boolean>(true);
 
     const clearSelectedNodeDetail = useCallback((): void => {
         try {
@@ -197,16 +203,40 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
         setThreadDialogBusy(true);
         setThreadDialogError("");
         try {
-            await createCodexThread(nodeId, { title, set_active: false });
+            await createCodexThread(nodeId, {
+                title,
+                set_active: newThreadSetActive,
+                cwd: String(newThreadCwd || "").trim() || undefined,
+                model: String(newThreadModel || "").trim() || undefined,
+                sandbox: String(newThreadSandbox || "").trim() || undefined,
+                approval_policy: String(newThreadApprovalPolicy || "").trim() || undefined,
+                personality: String(newThreadPersonality || "").trim() || undefined,
+            });
             await refreshSelectedNodeBundle();
             setShowCreateDialog(false);
             setNewThreadTitle("");
+            setNewThreadCwd("");
+            setNewThreadModel("");
+            setNewThreadSandbox("danger-full-access");
+            setNewThreadApprovalPolicy("on-failure");
+            setNewThreadPersonality("");
+            setNewThreadSetActive(true);
         } catch (e) {
             setThreadDialogError(`Create thread failed: ${String((e as Error)?.message || e)}`);
         } finally {
             setThreadDialogBusy(false);
         }
-    }, [newThreadTitle, refreshSelectedNodeBundle, selectedNodeDetail?.node_id]);
+    }, [
+        newThreadApprovalPolicy,
+        newThreadCwd,
+        newThreadModel,
+        newThreadPersonality,
+        newThreadSandbox,
+        newThreadSetActive,
+        newThreadTitle,
+        refreshSelectedNodeBundle,
+        selectedNodeDetail?.node_id,
+    ]);
 
     const onApplyThreadSwitch = useCallback(async (): Promise<void> => {
         const nodeId = String(selectedNodeDetail?.node_id || "").trim();
@@ -436,18 +466,116 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
                                         <h1 className="mx_Heading_h3 mx_Dialog_title">Create Codex Thread</h1>
                                     </div>
                                     <div className="mx_Dialog_content">
-                                        <input
-                                            value={newThreadTitle}
-                                            onChange={(e) => setNewThreadTitle(e.target.value)}
-                                            placeholder="e.g. debug-session"
-                                            style={{
-                                                width: "100%",
-                                                boxSizing: "border-box",
-                                                padding: 10,
-                                                borderRadius: 8,
-                                                border: "1px solid var(--cpd-color-border-subtle-primary)",
-                                            }}
-                                        />
+                                        <div style={{ display: "grid", gap: 10 }}>
+                                            <div>
+                                                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Title</div>
+                                                <input
+                                                    value={newThreadTitle}
+                                                    onChange={(e) => setNewThreadTitle(e.target.value)}
+                                                    placeholder="e.g. debug-session"
+                                                    style={{
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        padding: 10,
+                                                        borderRadius: 8,
+                                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>CWD (optional)</div>
+                                                <input
+                                                    value={newThreadCwd}
+                                                    onChange={(e) => setNewThreadCwd(e.target.value)}
+                                                    placeholder="/root/work/project"
+                                                    style={{
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        padding: 10,
+                                                        borderRadius: 8,
+                                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Model (optional)</div>
+                                                <input
+                                                    value={newThreadModel}
+                                                    onChange={(e) => setNewThreadModel(e.target.value)}
+                                                    placeholder="gpt-5-codex"
+                                                    style={{
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        padding: 10,
+                                                        borderRadius: 8,
+                                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                                <div>
+                                                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Sandbox</div>
+                                                    <select
+                                                        value={newThreadSandbox}
+                                                        onChange={(e) => setNewThreadSandbox(e.target.value)}
+                                                        style={{
+                                                            width: "100%",
+                                                            boxSizing: "border-box",
+                                                            padding: 10,
+                                                            borderRadius: 8,
+                                                            border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                            background: "var(--cpd-color-bg-canvas-default)",
+                                                        }}
+                                                    >
+                                                        <option value="danger-full-access">danger-full-access</option>
+                                                        <option value="workspace-write">workspace-write</option>
+                                                        <option value="read-only">read-only</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Approval policy</div>
+                                                    <select
+                                                        value={newThreadApprovalPolicy}
+                                                        onChange={(e) => setNewThreadApprovalPolicy(e.target.value)}
+                                                        style={{
+                                                            width: "100%",
+                                                            boxSizing: "border-box",
+                                                            padding: 10,
+                                                            borderRadius: 8,
+                                                            border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                            background: "var(--cpd-color-bg-canvas-default)",
+                                                        }}
+                                                    >
+                                                        <option value="on-failure">on-failure</option>
+                                                        <option value="on-request">on-request</option>
+                                                        <option value="never">never</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Personality (optional)</div>
+                                                <input
+                                                    value={newThreadPersonality}
+                                                    onChange={(e) => setNewThreadPersonality(e.target.value)}
+                                                    placeholder="default"
+                                                    style={{
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        padding: 10,
+                                                        borderRadius: 8,
+                                                        border: "1px solid var(--cpd-color-border-subtle-primary)",
+                                                    }}
+                                                />
+                                            </div>
+                                            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newThreadSetActive}
+                                                    onChange={(e) => setNewThreadSetActive(Boolean(e.target.checked))}
+                                                />
+                                                Set as active after create
+                                            </label>
+                                        </div>
                                     </div>
                                     <div className="mx_Dialog_buttons">
                                         <AccessibleButton element="button" kind="secondary" onClick={() => setShowCreateDialog(false)}>
